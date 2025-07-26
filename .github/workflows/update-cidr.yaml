@@ -38,6 +38,19 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install requests
+
+    - name: Test internet connectivity
+      run: |
+        echo "=== Testing Internet Connectivity ==="
+        echo "Testing basic connectivity..."
+        curl -I https://www.google.com || echo "Google failed"
+        echo "Testing BGPView API..."
+        curl -I https://api.bgpview.io/ || echo "BGPView failed"
+        echo "Testing with different user agent..."
+        curl -I -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" https://api.bgpview.io/ || echo "BGPView with UA failed"
+        echo "DNS resolution test..."
+        nslookup api.bgpview.io || echo "DNS resolution failed"
+      
         
     - name: Verify files and run script
       env:
