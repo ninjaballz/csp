@@ -11,28 +11,51 @@ import requests
 import random
 import ipaddress
 import socket
+import sys
+import argparse
 from datetime import datetime
 import time
 
 # Configuration
-COUNTRY = os.environ.get('COUNTRY', 'US')
-MAX_CIDRS_TO_SAVE = 3  # Save 2-3 best CIDRs
+MAX_CIDRS_TO_SAVE = 3  # Save 2-3 best CIDRs per country
 
 class FastBlacklistChecker:
     """Ultra-fast blacklist checker"""
     
     def check_spamhaus_zen(self, ip):
-        """Check Spamhaus ZEN"""
+        """Check Spamhaus ZEN - comprehensive SMTP blacklist check"""
         reversed_ip = '.'.join(reversed(ip.split('.')))
         query = f"{reversed_ip}.zen.spamhaus.org"
         
         try:
-            socket.setdefaulttimeout(2)
+            socket.setdefaulttimeout(3)
             result = socket.gethostbyname(query)
-            return False, 100  # Listed = bad
+            
+            # If we get a result, the IP is blacklisted
+            # Spamhaus returns different codes for different types of listings
+            result_parts = result.split('.')
+            if len(result_parts) == 4 and result_parts[0:3] == ['127', '0', '0']:
+                code = int(result_parts[3])
+                
+                # Spamhaus return codes
+                if code & 2:  # SBL (Spamhaus Block List)
+                    return False, 95  # Very bad for SMTP
+                elif code & 4:  # CSS (Spamhaus CSS)
+                    return False, 90  # Bad for SMTP
+                elif code & 8:  # PBL (Policy Block List)
+                    return False, 85  # Residential/dynamic IPs
+                elif code & 16:  # XBL (Exploits Block List)
+                    return False, 100  # Compromised machines
+                else:
+                    return False, 80  # Listed but unknown reason
+            
+            return False, 90  # Listed but couldn't parse code
+            
         except socket.gaierror:
-            return True, 0    # Not listed = good
-        except:
+            # No DNS record found = not listed = good for SMTP
+            return True, 0
+        except Exception as e:
+            print(f"    Spamhaus error: {e}")
             return None, 50
     
     def check_stopforumspam(self, ip):
@@ -49,37 +72,117 @@ class FastBlacklistChecker:
                 else:
                     confidence = min(data.get('ip', {}).get('confidence', 50), 100)
                     return False, confidence
-        except:
-            pass
+        except Exception as e:
+            print(f"    SFS error: {e}")
         
         return None, 25
     
-    def get_spam_score(self, ip):
-        """Get quick spam score"""
+    def check_sorbs(self, ip):
+        """Check SORBS SMTP blacklist"""
+        reversed_ip = '.'.join(reversed(ip.split('.')))
+        
+        # Check multiple SORBS lists
+        sorbs_lists = [
+            'dnsbl.sorbs.net',      # Main SORBS list
+            'smtp.dnsbl.sorbs.net', # SMTP-specific
+            'spam.dnsbl.sorbs.net'  # Spam sources
+        ]
+        
+        for dnsbl in sorbs_lists:
+            try:
+                query = f"{reversed_ip}.{dnsbl}"
+                socket.setdefaulttimeout(2)
+                result = socket.gethostbyname(query)
+                # If we get a result, IP is listed
+                return False, 85
+            except socket.gaierror:
+                continue  # Not listed in this DNSBL
+            except:
+                continue
+        
+        return True, 0  # Not listed in any SORBS list
+    
+    def check_barracuda(self, ip):
+        """Check Barracuda reputation block list"""
+        reversed_ip = '.'.join(reversed(ip.split('.')))
+        query = f"{reversed_ip}.b.barracudacentral.org"
+        
+        try:
+            socket.setdefaulttimeout(2)
+            result = socket.gethostbyname(query)
+            return False, 80  # Listed = bad for SMTP
+        except socket.gaierror:
+            return True, 0    # Not listed = good
+        except:
+            return None, 25
+    
+    def get_spam_score(self, ip, quiet=False):
+        """Get comprehensive SMTP spam score"""
+        if not quiet:
+            print(f"    🔍 Checking {ip}...")
+        
+        # Check all blacklists
         spamhaus_clean, spamhaus_score = self.check_spamhaus_zen(ip)
-        
-        if spamhaus_clean is False:
-            return 100, True
-        
+        sorbs_clean, sorbs_score = self.check_sorbs(ip)
+        barracuda_clean, barracuda_score = self.check_barracuda(ip)
         sfs_clean, sfs_score = self.check_stopforumspam(ip)
         
+        # If Spamhaus (most important for SMTP) says it's bad, it's bad
+        if spamhaus_clean is False:
+            if not quiet:
+                print(f"    ❌ Spamhaus: LISTED (score: {spamhaus_score})")
+            return spamhaus_score, True
+        
+        # Collect all valid scores
         scores = []
+        results = []
+        
         if spamhaus_clean is not None:
             scores.append(spamhaus_score)
+            results.append(f"Spamhaus: {'✅ Clean' if spamhaus_clean else '❌ Listed'}")
+        
+        if sorbs_clean is not None:
+            scores.append(sorbs_score)
+            results.append(f"SORBS: {'✅ Clean' if sorbs_clean else '❌ Listed'}")
+        
+        if barracuda_clean is not None:
+            scores.append(barracuda_score)
+            results.append(f"Barracuda: {'✅ Clean' if barracuda_clean else '❌ Listed'}")
+        
         if sfs_clean is not None:
             scores.append(sfs_score)
+            results.append(f"SFS: {'✅ Clean' if sfs_clean else '❌ Listed'}")
+        
+        # Print results
+        if not quiet:
+            for result in results:
+                print(f"      {result}")
         
         if not scores:
+            if not quiet:
+                print("    ⚠️  No blacklist results")
             return 50, False
         
-        avg_score = sum(scores) / len(scores)
-        is_blacklisted = avg_score > 50
+        # Calculate weighted average (Spamhaus gets more weight)
+        if len(scores) >= 3:
+            # If we have multiple scores, use weighted average
+            avg_score = sum(scores) / len(scores)
+        else:
+            # If limited data, be more conservative
+            avg_score = max(scores) if scores else 50
+        
+        # For SMTP, be strict - anything above 15 is risky
+        is_blacklisted = avg_score > 15
+        
+        if not quiet:
+            print(f"    📊 Final score: {avg_score:.1f} ({'❌ Risky' if is_blacklisted else '✅ Good'} for SMTP)")
         
         return avg_score, is_blacklisted
 
-def get_random_asns_from_bgpview(country_code):
+def get_random_asns_from_bgpview(country_code, quiet=False):
     """Fetch ASNs from BGPView search API and select randomly"""
-    print(f"🔍 Searching ASNs for {country_code} from BGPView...")
+    if not quiet:
+        print(f"🔍 Searching ASNs for {country_code} from BGPView...")
     
     url = f"https://api.bgpview.io/search?query_term={country_code}"
     
@@ -90,19 +193,22 @@ def get_random_asns_from_bgpview(country_code):
             data = response.json()
             
             # Debug: Show what we got
-            print(f"📊 API Response status: {data.get('status')}")
-            print(f"📊 API Response message: {data.get('status_message')}")
+            if not quiet:
+                print(f"📊 API Response status: {data.get('status')}")
+                print(f"📊 API Response message: {data.get('status_message')}")
             
             # The ASNs are in data.data.asns (nested)
             asns_data = data.get('data', {})
             asns_list = asns_data.get('asns', [])
             
             if not asns_list:
-                print(f"⚠️  No ASNs in response for {country_code}")
+                if not quiet:
+                    print(f"⚠️  No ASNs in response for {country_code}")
                 # Try alternative approach - search by country name
-                return get_asns_by_country_name(country_code)
+                return get_asns_by_country_name(country_code, quiet=quiet)
             
-            print(f"✅ Found {len(asns_list)} ASNs for {country_code}")
+            if not quiet:
+                print(f"✅ Found {len(asns_list)} ASNs for {country_code}")
             
             # Filter for residential ISPs
             residential_asns = []
@@ -170,7 +276,8 @@ def get_random_asns_from_bgpview(country_code):
                     })
             
             if not residential_asns:
-                print("⚠️  No residential ASNs identified, using top ASNs")
+                if not quiet:
+                    print("⚠️  No residential ASNs identified, using top ASNs")
                 # Use first few ASNs as fallback
                 for asn_entry in asns_list[:10]:
                     residential_asns.append({
@@ -180,7 +287,8 @@ def get_random_asns_from_bgpview(country_code):
                         'priority': 4
                     })
             
-            print(f"📊 Identified {len(residential_asns)} potential residential ASNs")
+            if not quiet:
+                print(f"📊 Identified {len(residential_asns)} potential residential ASNs")
             
             # Sort by priority
             residential_asns.sort(key=lambda x: x['priority'])
@@ -209,20 +317,22 @@ def get_random_asns_from_bgpview(country_code):
             # Extract ASN numbers
             selected_asn_numbers = [a['asn'] for a in selected_asns]
             
-            print(f"🎲 Randomly selected {len(selected_asn_numbers)} ASNs:")
-            for asn_info in selected_asns:
-                print(f"   AS{asn_info['asn']}: {asn_info['name']} - {asn_info['description'][:50]}...")
+            if not quiet:
+                print(f"🎲 Randomly selected {len(selected_asn_numbers)} ASNs:")
+                for asn_info in selected_asns:
+                    print(f"   AS{asn_info['asn']}: {asn_info['name']} - {asn_info['description'][:50]}...")
             
             return selected_asn_numbers
             
     except Exception as e:
-        print(f"❌ Error fetching from BGPView: {e}")
-        import traceback
-        traceback.print_exc()
+        if not quiet:
+            print(f"❌ Error fetching from BGPView: {e}")
+            import traceback
+            traceback.print_exc()
     
     return []
 
-def get_asns_by_country_name(country_code):
+def get_asns_by_country_name(country_code, quiet=False):
     """Alternative: Get ASNs by searching country name"""
     country_names = {
         'US': 'United States',
@@ -238,7 +348,8 @@ def get_asns_by_country_name(country_code):
     }
     
     country_name = country_names.get(country_code, country_code)
-    print(f"🔍 Trying alternative search for: {country_name}")
+    if not quiet:
+        print(f"🔍 Trying alternative search for: {country_name}")
     
     # Alternative approach - use known residential ASNs
     known_residential = {
@@ -252,12 +363,13 @@ def get_asns_by_country_name(country_code):
     if country_code in known_residential:
         asns = known_residential[country_code]
         selected = random.sample(asns, min(3, len(asns)))
-        print(f"✅ Using known residential ASNs: {selected}")
+        if not quiet:
+            print(f"✅ Using known residential ASNs: {selected}")
         return selected
     
     return []
 
-def fetch_prefixes_for_asn(asn):
+def fetch_prefixes_for_asn(asn, quiet=False):
     """Fetch prefixes for ASN from BGPView"""
     url = f"https://api.bgpview.io/asn/{asn}/prefixes"
     
@@ -286,7 +398,8 @@ def fetch_prefixes_for_asn(asn):
                 return random.sample(prefixes, 5)
             return prefixes
     except Exception as e:
-        print(f"  ❌ Error fetching AS{asn}: {e}")
+        if not quiet:
+            print(f"  ❌ Error fetching AS{asn}: {e}")
     
     return []
 
@@ -308,145 +421,505 @@ def generate_test_ip(cidr):
     except:
         return None
 
-def test_cidr_cleanliness(cidr, checker):
-    """Test if CIDR is clean"""
+def get_countries_from_user():
+    """Get country codes from user input or environment/args"""
+    
+    # Check for environment variable first (for GitHub Actions)
+    env_countries = os.environ.get('COUNTRIES', '').strip()
+    if env_countries:
+        print(f"🌍 Using countries from environment: {env_countries}")
+        countries = []
+        for country in env_countries.upper().split(','):
+            country = country.strip()
+            if len(country) == 2 and country.isalpha():
+                countries.append(country)
+            else:
+                print(f"⚠️  Invalid country code from env: {country} (must be 2 letters)")
+        
+        if countries:
+            print(f"✅ Selected countries from environment: {', '.join(countries)}")
+            return countries
+        else:
+            print("❌ No valid country codes in environment variable")
+    
+    # Check if we're in a non-interactive environment (GitHub Actions)
+    if not sys.stdin.isatty() or os.environ.get('CI') == 'true' or os.environ.get('GITHUB_ACTIONS') == 'true':
+        print("🤖 Running in automated/CI environment")
+        print("💡 Use COUNTRIES environment variable or --countries argument")
+        print("   Example: COUNTRIES='US,GB,DE' python check.py")
+        print("   Or: python check.py --countries US,GB,DE")
+        
+        # Default to a common country if nothing specified
+        default_country = os.environ.get('DEFAULT_COUNTRY', 'US')
+        print(f"🎯 Using default country: {default_country}")
+        return [default_country]
+    
+    # Interactive mode for local usage
+    print("🌍 Country Selection")
+    print("Enter country codes (e.g., US, GB, DE, MY, etc.)")
+    print("You can enter multiple countries separated by commas")
+    print("Examples:")
+    print("  - Single: US")
+    print("  - Multiple: US,GB,DE")
+    print("  - Mixed: US, MY, GB")
+    print()
+    
+    while True:
+        try:
+            user_input = input("Enter country code(s): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n❌ Input cancelled. Using default country: US")
+            return ['US']
+        
+        if not user_input:
+            print("❌ Please enter at least one country code")
+            continue
+        
+        # Parse country codes
+        countries = []
+        for country in user_input.upper().split(','):
+            country = country.strip()
+            if len(country) == 2 and country.isalpha():
+                countries.append(country)
+            else:
+                print(f"⚠️  Invalid country code: {country} (must be 2 letters)")
+        
+        if countries:
+            print(f"✅ Selected countries: {', '.join(countries)}")
+            return countries
+        else:
+            print("❌ No valid country codes found. Please try again.")
+
+def get_total_cidrs_from_user():
+    """Get total number of CIDRs from user input"""
+    
+    # Check environment variable first (for GitHub Actions)
+    env_total = os.environ.get('TOTAL_CIDRS', '').strip()
+    if env_total:
+        try:
+            total = int(env_total)
+            if total > 0:
+                print(f"📊 Using total CIDRs from environment: {total}")
+                return total
+        except ValueError:
+            print(f"⚠️  Invalid TOTAL_CIDRS environment variable: {env_total}")
+    
+    # Check if we're in a non-interactive environment (GitHub Actions)
+    if not sys.stdin.isatty() or os.environ.get('CI') == 'true' or os.environ.get('GITHUB_ACTIONS') == 'true':
+        default_total = 20
+        print(f"🤖 Using default total CIDRs for CI: {default_total}")
+        return default_total
+    
+    # Interactive mode
+    print("\n📊 CIDR Quantity Selection")
+    print("How many clean CIDRs do you want in total?")
+    print("Examples: 10, 20, 50, 100")
+    print("(Will be distributed evenly across selected countries)")
+    print()
+    
+    while True:
+        try:
+            user_input = input("Enter total number of CIDRs: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n❌ Input cancelled. Using default: 20")
+            return 20
+        
+        try:
+            total = int(user_input)
+            if total <= 0:
+                print("❌ Please enter a positive number")
+                continue
+            elif total > 200:
+                print("⚠️  That's a lot! Are you sure? (Max recommended: 200)")
+                confirm = input("Continue? (y/n): ").strip().lower()
+                if confirm not in ['y', 'yes']:
+                    continue
+            
+            print(f"✅ Will generate {total} clean CIDRs total")
+            return total
+            
+        except ValueError:
+            print("❌ Please enter a valid number")
+
+def parse_arguments():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description='Clean CIDR Auto-Fetcher for SMTP Sending',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  python check.py                                   # Interactive mode
+  python check.py --countries US,GB,DE --total-cidrs 30  # 30 CIDRs from 3 countries
+  COUNTRIES=US,MY TOTAL_CIDRS=20 python check.py    # Environment variables
+  
+For GitHub Actions:
+  - name: Get Clean CIDRs
+    env:
+      COUNTRIES: "US,GB,DE"
+      TOTAL_CIDRS: "50"
+    run: python check.py
+        '''
+    )
+    
+    parser.add_argument(
+        '--total-cidrs', '-t',
+        type=int,
+        default=20,
+        help='Total number of CIDRs to generate (default: 20)'
+    )
+    
+    parser.add_argument(
+        '--countries', '-c',
+        type=str,
+        help='Comma-separated list of country codes (e.g., US,GB,DE)'
+    )
+    
+    parser.add_argument(
+        '--max-cidrs', '-m',
+        type=int,
+        help='DEPRECATED: Use --total-cidrs instead'
+    )
+    
+    parser.add_argument(
+        '--output', '-o',
+        type=str,
+        default='cidr-ranges.txt',
+        help='Output file for CIDR ranges (default: cidr-ranges.txt)'
+    )
+    
+    parser.add_argument(
+        '--report', '-r',
+        type=str,
+        default='clean-report.json',
+        help='Output file for detailed report (default: clean-report.json)'
+    )
+    
+    parser.add_argument(
+        '--quiet', '-q',
+        action='store_true',
+        help='Reduce output verbosity'
+    )
+    
+    return parser.parse_args()
+
+def test_cidr_cleanliness(cidr, checker, quiet=False):
+    """Test if CIDR is clean for SMTP sending"""
     test_ip = generate_test_ip(cidr)
     if not test_ip:
         return None
     
-    score, is_blacklisted = checker.get_spam_score(test_ip)
+    score, is_blacklisted = checker.get_spam_score(test_ip, quiet=quiet)
     
     return {
         'cidr': cidr,
         'test_ip': test_ip,
         'score': score,
         'blacklisted': is_blacklisted,
-        'clean': score < 20
+        'clean': score <= 10  # Stricter threshold for SMTP
     }
 
-def main():
-    """Main function"""
-    print(f"🚀 Clean CIDR Auto-Fetcher for ninjaballz")
-    print(f"📅 Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
-    print(f"🌍 Country: {COUNTRY}")
-    print()
+def process_country(country, target_cidrs=3, quiet=False):
+    """Process a single country and return clean CIDRs"""
+    if not quiet:
+        print(f"\n🌍 Processing Country: {country}")
+        print("=" * 50)
     
-    # Get random ASNs from BGPView
-    asns = get_random_asns_from_bgpview(COUNTRY)
-    
-    if not asns:
-        print("❌ No ASNs found")
-        return
-    
-    # Collect CIDRs from ASNs
     all_cidrs = []
     asn_map = {}
+    max_retries = 8  # Increased retries for higher targets
+    retry_count = 0
     
-    for asn in asns:
-        print(f"\n📡 Fetching prefixes for AS{asn}...")
-        prefixes = fetch_prefixes_for_asn(asn)
+    # We need more CIDRs to test to find enough clean ones
+    min_cidrs_needed = max(target_cidrs * 2, 10)
+    
+    while len(all_cidrs) < min_cidrs_needed and retry_count < max_retries:
+        retry_count += 1
+        if not quiet:
+            print(f"\n🔄 Attempt {retry_count}/{max_retries} to find good ASNs for {country}...")
         
-        if prefixes:
-            print(f"  ✅ Got {len(prefixes)} prefixes")
-            for prefix in prefixes:
-                all_cidrs.append(prefix)
-                asn_map[prefix] = asn
+        # Get random ASNs from BGPView
+        asns = get_random_asns_from_bgpview(country, quiet=quiet)
+        
+        if not asns:
+            if not quiet:
+                print("❌ No ASNs found in this attempt")
+            continue
+        
+        # Collect CIDRs from ASNs
+        attempt_cidrs = []
+        attempt_asn_map = {}
+        
+        for asn in asns:
+            if not quiet:
+                print(f"📡 Fetching prefixes for AS{asn}...")
+            prefixes = fetch_prefixes_for_asn(asn, quiet=quiet)
+            
+            if prefixes:
+                if not quiet:
+                    print(f"  ✅ Got {len(prefixes)} prefixes")
+                for prefix in prefixes:
+                    attempt_cidrs.append(prefix)
+                    attempt_asn_map[prefix] = asn
+            else:
+                if not quiet:
+                    print(f"  ⚠️  No prefixes found for AS{asn}")
+            
+            time.sleep(1)  # Rate limiting
+        
+        if attempt_cidrs:
+            if not quiet:
+                print(f"✅ Found {len(attempt_cidrs)} CIDRs in this attempt")
+            all_cidrs.extend(attempt_cidrs)
+            asn_map.update(attempt_asn_map)
+            
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_cidrs = []
+            unique_asn_map = {}
+            for cidr in all_cidrs:
+                if cidr not in seen:
+                    seen.add(cidr)
+                    unique_cidrs.append(cidr)
+                    unique_asn_map[cidr] = asn_map[cidr]
+            
+            all_cidrs = unique_cidrs
+            asn_map = unique_asn_map
+            
+            if len(all_cidrs) >= min_cidrs_needed:
+                if not quiet:
+                    print(f"🎯 Collected enough CIDRs ({len(all_cidrs)}), proceeding to test...")
+                break
         else:
-            print(f"  ⚠️  No prefixes found")
-        
-        time.sleep(1)  # Rate limiting
+            if not quiet:
+                print(f"❌ No CIDRs found in attempt {retry_count}, trying different ASNs...")
+            time.sleep(2)  # Wait before retry
     
     if not all_cidrs:
-        print("❌ No CIDRs collected")
-        return
+        if not quiet:
+            print(f"❌ No CIDRs collected for {country} after all attempts")
+        return []
     
     # Test CIDRs for cleanliness
-    print(f"\n🔍 Testing {len(all_cidrs)} CIDRs...")
+    if not quiet:
+        print(f"\n🔍 Testing {len(all_cidrs)} CIDRs for SMTP cleanliness in {country}...")
+        print(f"🎯 Target: {target_cidrs} clean CIDRs")
     
     checker = FastBlacklistChecker()
     tested_results = []
     
     # Test each CIDR
     for i, cidr in enumerate(all_cidrs):
-        print(f"  [{i+1}/{len(all_cidrs)}] Testing {cidr}...", end='', flush=True)
+        if not quiet:
+            print(f"  [{i+1}/{len(all_cidrs)}] Testing {cidr}...")
         
-        result = test_cidr_cleanliness(cidr, checker)
+        result = test_cidr_cleanliness(cidr, checker, quiet=quiet)
         if result:
             result['asn'] = asn_map.get(cidr, 'Unknown')
+            result['country'] = country
             tested_results.append(result)
             
-            if result['clean']:
-                print(f" ✅ Clean (score: {result['score']:.1f})")
-            else:
-                print(f" ❌ Dirty (score: {result['score']:.1f})")
+            if not quiet:
+                if result['clean']:
+                    print(f"    ✅ CLEAN for SMTP (score: {result['score']:.1f})")
+                else:
+                    print(f"    ❌ NOT CLEAN (score: {result['score']:.1f})")
         else:
-            print(" ⚠️  Failed")
+            if not quiet:
+                print("    ⚠️  Test failed")
         
         time.sleep(0.5)  # Rate limiting
     
     # Sort by score (lower is better)
     tested_results.sort(key=lambda x: x['score'])
     
-    # Get the cleanest CIDRs
-    clean_cidrs = [r for r in tested_results if r['clean']][:MAX_CIDRS_TO_SAVE]
+    # Get the cleanest CIDRs up to target
+    clean_cidrs = [r for r in tested_results if r['clean']][:target_cidrs]
     
-    # If not enough clean ones, take best scored
-    if len(clean_cidrs) < 2:
-        clean_cidrs = tested_results[:MAX_CIDRS_TO_SAVE]
-    
-    # ninjaballz custom ranges
-    custom_ranges = [
-        '46.44.64.0/18',
-        '121.122.0.0/17',
-        '62.178.128.0/17',
-        '150.91.224.0/20'
-    ]
-    
-    # Write results
-    with open('cidr-ranges.txt', 'w') as f:
-        f.write(f"# Clean Residential CIDRs\n")
-        f.write(f"# Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n")
-        f.write(f"# User: ninjaballz\n")
-        f.write(f"# Country: {COUNTRY}\n")
-        f.write(f"# Auto-updated every 10 minutes via BGPView\n\n")
+    # If not enough clean ones, take best scored overall up to target
+    if len(clean_cidrs) < target_cidrs:
+        if not quiet:
+            print(f"⚠️  Only {len(clean_cidrs)} truly clean CIDRs found, adding best available...")
         
-        # Custom ranges
-        f.write("# ninjaballz custom ranges\n")
-        for cidr in custom_ranges:
-            f.write(f"{cidr}\n")
+        # Add best available non-clean CIDRs to reach target
+        remaining_needed = target_cidrs - len(clean_cidrs)
+        non_clean_cidrs = [r for r in tested_results if not r['clean']][:remaining_needed]
         
-        # Clean residential ranges
-        f.write(f"\n# Clean {COUNTRY} Residential Ranges (Random ASNs)\n")
-        for result in clean_cidrs:
-            f.write(f"# AS{result['asn']} - Score: {result['score']:.1f} - Test IP: {result['test_ip']}\n")
-            f.write(f"{result['cidr']}\n")
+        for result in non_clean_cidrs:
+            result['country'] = country
+        
+        clean_cidrs.extend(non_clean_cidrs)
     
-    # Save report
+    if not quiet:
+        clean_count = len([r for r in clean_cidrs if r['clean']])
+        total_count = len(clean_cidrs)
+        print(f"\n✅ {country} Complete! Found {total_count} CIDRs ({clean_count} truly clean)")
+    
+    return clean_cidrs
+
+def main():
+    """Main function"""
+    args = parse_arguments()
+    
+    if not args.quiet:
+        print(f"🚀 Clean CIDR Auto-Fetcher for SMTP Sending")
+        print(f"📅 Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        print(f"📧 Optimized for SMTP delivery (strict blacklist checking)")
+        
+        # Show environment info for debugging
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            print(f"🤖 Running in GitHub Actions")
+        elif os.environ.get('CI') == 'true':
+            print(f"🤖 Running in CI environment")
+        
+        print()
+    
+    # Get countries from args, environment, or user input
+    if args.countries:
+        # From command line argument
+        countries = []
+        for country in args.countries.upper().split(','):
+            country = country.strip()
+            if len(country) == 2 and country.isalpha():
+                countries.append(country)
+            else:
+                print(f"⚠️  Invalid country code: {country} (must be 2 letters)")
+        
+        if not countries:
+            print("❌ No valid countries in --countries argument")
+            return
+            
+        if not args.quiet:
+            print(f"✅ Using countries from arguments: {', '.join(countries)}")
+    else:
+        # From environment or interactive input
+        countries = get_countries_from_user()
+    
+    # Get total CIDRs from args, environment, or user input
+    if args.total_cidrs:
+        total_cidrs = args.total_cidrs
+        if not args.quiet:
+            print(f"✅ Using total CIDRs from arguments: {total_cidrs}")
+    else:
+        total_cidrs = get_total_cidrs_from_user()
+    
+    # Calculate CIDRs per country (distribute evenly)
+    cidrs_per_country = max(1, total_cidrs // len(countries))
+    remaining_cidrs = total_cidrs % len(countries)
+    
+    if not args.quiet:
+        print(f"\n📊 Distribution Plan:")
+        print(f"   Total CIDRs needed: {total_cidrs}")
+        print(f"   Countries: {len(countries)} ({', '.join(countries)})")
+        print(f"   CIDRs per country: {cidrs_per_country}")
+        if remaining_cidrs > 0:
+            print(f"   Extra CIDRs for first {remaining_cidrs} countries: +1 each")
+    
+    # Process each country
+    all_clean_cidrs = []
+    country_results = {}
+    
+    for i, country in enumerate(countries):
+        # Some countries get +1 CIDR to distribute remainder evenly
+        country_target = cidrs_per_country + (1 if i < remaining_cidrs else 0)
+        
+        if not args.quiet:
+            print(f"\n🎯 Target for {country}: {country_target} CIDRs")
+        
+        clean_cidrs = process_country(country, target_cidrs=country_target, quiet=args.quiet)
+        if clean_cidrs:
+            all_clean_cidrs.extend(clean_cidrs)
+            country_results[country] = clean_cidrs
+    
+    if not all_clean_cidrs:
+        print("❌ No clean CIDRs found for any country!")
+        return
+    
+    # Write results - ONLY CIDRs in the main file
+    with open(args.output, 'w') as f:
+        # Write all CIDRs, no comments or headers
+        for country in countries:
+            if country in country_results:
+                for result in country_results[country]:
+                    f.write(f"{result['cidr']}\n")
+    
+    # Save detailed report with all the metadata
     report = {
         'timestamp': datetime.utcnow().isoformat(),
-        'country': COUNTRY,
-        'asns_used': asns,
-        'total_tested': len(tested_results),
-        'clean_found': len([r for r in tested_results if r['clean']]),
-        'saved_cidrs': [r['cidr'] for r in clean_cidrs],
-        'best_scores': clean_cidrs
+        'countries': countries,
+        'total_cidrs_requested': total_cidrs,
+        'total_cidrs_found': len(all_clean_cidrs),
+        'distribution': {
+            'cidrs_per_country': cidrs_per_country,
+            'remaining_cidrs': remaining_cidrs
+        },
+        'results_by_country': {},
+        'summary': {
+            'countries_processed': len(countries),
+            'countries_with_results': len(country_results),
+        },
+        'environment': {
+            'github_actions': os.environ.get('GITHUB_ACTIONS') == 'true',
+            'ci': os.environ.get('CI') == 'true',
+            'runner_os': os.environ.get('RUNNER_OS', 'unknown')
+        }
     }
     
-    with open('clean-report.json', 'w') as f:
+    # Add detailed results for each country
+    for country in countries:
+        if country in country_results:
+            report['results_by_country'][country] = {
+                'target_cidrs': cidrs_per_country + (1 if countries.index(country) < remaining_cidrs else 0),
+                'clean_cidrs_found': len(country_results[country]),
+                'saved_cidrs': [r['cidr'] for r in country_results[country]],
+                'detailed_results': country_results[country]
+            }
+        else:
+            target = cidrs_per_country + (1 if countries.index(country) < remaining_cidrs else 0)
+            report['results_by_country'][country] = {
+                'target_cidrs': target,
+                'clean_cidrs_found': 0,
+                'saved_cidrs': [],
+                'detailed_results': []
+            }
+    
+    with open(args.report, 'w') as f:
         json.dump(report, f, indent=2)
     
-    # Summary
-    print(f"\n✅ Complete!")
-    print(f"📊 Summary:")
-    print(f"   Country: {COUNTRY}")
-    print(f"   ASNs used: {asns}")
-    print(f"   CIDRs tested: {len(tested_results)}")
-    print(f"   Clean CIDRs saved: {len(clean_cidrs)}")
-    
-    if clean_cidrs:
-        print(f"\n🏆 Best CIDRs:")
-        for r in clean_cidrs:
-            print(f"   {r['cidr']} (AS{r['asn']}, score: {r['score']:.1f})")
+    # Final Summary
+    if not args.quiet:
+        print(f"\n" + "=" * 60)
+        print(f"🎉 FINAL SUMMARY")
+        print(f"=" * 60)
+        print(f"📅 Completed: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        print(f"� Target: {total_cidrs} CIDRs, Found: {len(all_clean_cidrs)} CIDRs")
+        print(f"🌍 Countries processed: {len(countries)}")
+        print(f"✅ Countries with results: {len(country_results)}")
+        
+        if country_results:
+            print(f"\n🏆 Results by Country:")
+            for i, country in enumerate(countries):
+                target = cidrs_per_country + (1 if i < remaining_cidrs else 0)
+                if country in country_results:
+                    found = len(country_results[country])
+                    status = "✅" if found >= target else "⚠️"
+                    print(f"   {country}: {found}/{target} CIDRs {status}")
+                    for r in country_results[country][:3]:  # Show first 3
+                        print(f"      {r['cidr']} (AS{r['asn']}, score: {r['score']:.1f})")
+                    if len(country_results[country]) > 3:
+                        print(f"      ... and {len(country_results[country]) - 3} more")
+                else:
+                    print(f"   {country}: 0/{target} CIDRs ❌")
+        else:
+            print(f"\n❌ No suitable CIDRs found for any country!")
+        
+        print(f"\n📁 Files generated:")
+        print(f"   📄 {args.output} - Clean CIDR ranges (CIDRs only)")
+        print(f"   📄 {args.report} - Detailed JSON report (with metadata)")
+    else:
+        # Quiet mode - just print essential info
+        success_rate = (len(all_clean_cidrs) / total_cidrs * 100) if total_cidrs > 0 else 0
+        print(f"Found {len(all_clean_cidrs)}/{total_cidrs} CIDRs ({success_rate:.1f}%) from {len(countries)} countries")
+        print(f"Generated: {args.output}, {args.report}")
 
 if __name__ == "__main__":
     random.seed(int(time.time()))
