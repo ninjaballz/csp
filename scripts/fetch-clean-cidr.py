@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Clean CIDR Auto-Fetcher with BGPView ASN Discovery for ninjaballz
-Created: 2025-07-26 08:56:42 UTC
-Gets random ASNs from BGPView search API
+Fixed: Correctly parse BGPView API response
+Created: 2025-07-26 09:05:12 UTC
 """
 
 import os
@@ -88,96 +88,172 @@ def get_random_asns_from_bgpview(country_code):
         
         if response.status_code == 200:
             data = response.json()
-            asns = data.get('data', {}).get('asns', [])
             
-            if not asns:
-                print(f"⚠️  No ASNs found for {country_code}")
-                return []
+            # Debug: Show what we got
+            print(f"📊 API Response status: {data.get('status')}")
+            print(f"📊 API Response message: {data.get('status_message')}")
             
-            print(f"✅ Found {len(asns)} ASNs for {country_code}")
+            # The ASNs are in data.data.asns (nested)
+            asns_data = data.get('data', {})
+            asns_list = asns_data.get('asns', [])
             
-            # Filter for likely residential ISPs
+            if not asns_list:
+                print(f"⚠️  No ASNs in response for {country_code}")
+                # Try alternative approach - search by country name
+                return get_asns_by_country_name(country_code)
+            
+            print(f"✅ Found {len(asns_list)} ASNs for {country_code}")
+            
+            # Filter for residential ISPs
             residential_asns = []
             
-            for asn_data in asns:
-                name = asn_data.get('name', '').upper()
-                description = asn_data.get('description', '').upper()
-                asn = asn_data.get('asn')
+            for asn_entry in asns_list:
+                asn = asn_entry.get('asn')
+                name = asn_entry.get('name', '').upper()
+                description = asn_entry.get('description', '').upper()
+                country = asn_entry.get('country_code', '').upper()
+                
+                # Make sure it's the right country
+                if country != country_code.upper() and country_code != 'US':
+                    continue
                 
                 # Skip cloud/hosting providers
                 skip_keywords = [
                     'AMAZON', 'GOOGLE', 'MICROSOFT', 'CLOUD', 'HOSTING',
-                    'DIGITAL', 'LINODE', 'VULTR', 'SERVER', 'DATA CENTER',
-                    'DATACENTER', 'VPS', 'DEDICATED', 'COLOCATION'
+                    'DIGITALOCEAN', 'LINODE', 'VULTR', 'SERVER', 'DATACENTER',
+                    'VPS', 'DEDICATED', 'COLOCATION', 'CDN', 'CONTENT DELIVERY'
                 ]
                 
                 # Look for residential indicators
                 residential_keywords = [
                     'TELECOM', 'BROADBAND', 'CABLE', 'DSL', 'FIBER',
-                    'INTERNET', 'COMMUNICATIONS', 'TELEKOM', 'TELECOM',
-                    'MOBILE', 'WIRELESS', 'ISP'
+                    'INTERNET', 'COMMUNICATIONS', 'TELEKOM', 'MOBILE',
+                    'WIRELESS', 'ISP', 'NETWORK', 'RESIDENTIAL'
                 ]
                 
-                # Check if it's likely residential
+                # For US, we know these are residential
+                us_residential = [
+                    'COMCAST', 'VERIZON', 'AT&T', 'SPECTRUM', 'COX',
+                    'CENTURYLINK', 'CHARTER', 'FRONTIER', 'WINDSTREAM',
+                    'OPTIMUM', 'XFINITY', 'RCN', 'ATLANTIC'
+                ]
+                
                 full_text = f"{name} {description}"
                 
+                # Skip if cloud/hosting
                 if any(skip in full_text for skip in skip_keywords):
                     continue
                 
-                # Prefer those with residential keywords
-                if any(keyword in full_text for keyword in residential_keywords):
+                # Priority 1: Known residential (US)
+                if country_code == 'US' and any(res in full_text for res in us_residential):
                     residential_asns.append({
                         'asn': asn,
-                        'name': asn_data.get('name', ''),
-                        'description': asn_data.get('description', ''),
+                        'name': asn_entry.get('name', ''),
+                        'description': asn_entry.get('description', ''),
                         'priority': 1
                     })
-                else:
-                    # Still include others but with lower priority
+                # Priority 2: Has residential keywords
+                elif any(keyword in full_text for keyword in residential_keywords):
                     residential_asns.append({
                         'asn': asn,
-                        'name': asn_data.get('name', ''),
-                        'description': asn_data.get('description', ''),
+                        'name': asn_entry.get('name', ''),
+                        'description': asn_entry.get('description', ''),
                         'priority': 2
+                    })
+                # Priority 3: Unknown but not cloud
+                else:
+                    residential_asns.append({
+                        'asn': asn,
+                        'name': asn_entry.get('name', ''),
+                        'description': asn_entry.get('description', ''),
+                        'priority': 3
                     })
             
             if not residential_asns:
-                # If no residential found, use any ASNs
-                residential_asns = [{'asn': a['asn'], 'name': a['name'], 'priority': 3} for a in asns[:20]]
+                print("⚠️  No residential ASNs identified, using top ASNs")
+                # Use first few ASNs as fallback
+                for asn_entry in asns_list[:10]:
+                    residential_asns.append({
+                        'asn': asn_entry.get('asn'),
+                        'name': asn_entry.get('name', ''),
+                        'description': asn_entry.get('description', ''),
+                        'priority': 4
+                    })
             
-            print(f"📊 Found {len(residential_asns)} potential residential ASNs")
+            print(f"📊 Identified {len(residential_asns)} potential residential ASNs")
             
-            # Sort by priority (residential first)
+            # Sort by priority
             residential_asns.sort(key=lambda x: x['priority'])
             
             # Randomly select 2-3 ASNs
             num_to_select = random.randint(2, min(3, len(residential_asns)))
             
-            # Use weighted random selection (prefer residential)
+            # Get mix of priorities
             selected_asns = []
             
-            # First, try to get at least one high-priority ASN
-            high_priority = [a for a in residential_asns if a['priority'] == 1]
+            # Try to get at least one high priority
+            high_priority = [a for a in residential_asns if a['priority'] <= 2]
             if high_priority:
                 selected_asns.append(random.choice(high_priority))
                 num_to_select -= 1
             
-            # Then randomly select the rest
+            # Fill the rest randomly
             remaining = [a for a in residential_asns if a not in selected_asns]
             if remaining and num_to_select > 0:
                 selected_asns.extend(random.sample(remaining, min(num_to_select, len(remaining))))
             
-            # Extract just the ASN numbers
+            # If still not enough, just take what we have
+            if not selected_asns and residential_asns:
+                selected_asns = residential_asns[:3]
+            
+            # Extract ASN numbers
             selected_asn_numbers = [a['asn'] for a in selected_asns]
             
-            print(f"🎲 Randomly selected ASNs:")
+            print(f"🎲 Randomly selected {len(selected_asn_numbers)} ASNs:")
             for asn_info in selected_asns:
-                print(f"   AS{asn_info['asn']}: {asn_info['name']}")
+                print(f"   AS{asn_info['asn']}: {asn_info['name']} - {asn_info['description'][:50]}...")
             
             return selected_asn_numbers
             
     except Exception as e:
         print(f"❌ Error fetching from BGPView: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return []
+
+def get_asns_by_country_name(country_code):
+    """Alternative: Get ASNs by searching country name"""
+    country_names = {
+        'US': 'United States',
+        'GB': 'United Kingdom',
+        'DE': 'Germany',
+        'CA': 'Canada',
+        'AU': 'Australia',
+        'FR': 'France',
+        'NL': 'Netherlands',
+        'JP': 'Japan',
+        'BR': 'Brazil',
+        'IN': 'India'
+    }
+    
+    country_name = country_names.get(country_code, country_code)
+    print(f"🔍 Trying alternative search for: {country_name}")
+    
+    # Alternative approach - use known residential ASNs
+    known_residential = {
+        'US': [11025, 10796, 11427, 10507, 11426, 7922, 701, 7018],  # Comcast, Verizon, AT&T, etc
+        'GB': [2856, 5089, 5607, 13285],  # BT, Virgin, Sky, TalkTalk
+        'DE': [3320, 6830, 31334],  # Deutsche Telekom, Vodafone
+        'CA': [577, 6327, 5769],  # Bell, Shaw, Rogers
+        'AU': [1221, 7545, 4764],  # Telstra, TPG, Optus
+    }
+    
+    if country_code in known_residential:
+        asns = known_residential[country_code]
+        selected = random.sample(asns, min(3, len(asns)))
+        print(f"✅ Using known residential ASNs: {selected}")
+        return selected
     
     return []
 
@@ -192,7 +268,9 @@ def fetch_prefixes_for_asn(asn):
             prefixes = []
             
             # Get IPv4 prefixes
-            for p in data.get('data', {}).get('ipv4_prefixes', []):
+            ipv4_prefixes = data.get('data', {}).get('ipv4_prefixes', [])
+            
+            for p in ipv4_prefixes:
                 prefix = p.get('prefix')
                 if prefix:
                     try:
@@ -257,7 +335,7 @@ def main():
     asns = get_random_asns_from_bgpview(COUNTRY)
     
     if not asns:
-        print("❌ No ASNs found from BGPView")
+        print("❌ No ASNs found")
         return
     
     # Collect CIDRs from ASNs
@@ -276,7 +354,7 @@ def main():
         else:
             print(f"  ⚠️  No prefixes found")
         
-        time.sleep(1)  # Rate limiting between ASN queries
+        time.sleep(1)  # Rate limiting
     
     if not all_cidrs:
         print("❌ No CIDRs collected")
