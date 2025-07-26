@@ -1,0 +1,64 @@
+name: Auto Clean CIDR Update
+
+on:
+  schedule:
+    # Run every 10 minutes
+    - cron: '*/10 * * * *'
+  
+  push:
+    branches: [ main ]
+    paths:
+      - 'scripts/fetch-clean-cidr.py'
+  
+  workflow_dispatch:
+
+jobs:
+  update-clean-cidrs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+    
+    - name: Install dependencies
+      run: |
+        pip install requests ipaddress
+    
+    - name: Select random country
+      id: country
+      run: |
+        # Rotate countries every 10 minutes
+        COUNTRIES=("US" "GB" "DE" "CA" "AU" "FR" "NL" "JP" "BR" "IN" "KR" "ES" "IT" "PL" "SE")
+        MINUTES=$(date +%M)
+        INDEX=$((MINUTES / 10 % ${#COUNTRIES[@]}))
+        COUNTRY=${COUNTRIES[$INDEX]}
+        echo "🌍 Selected country: $COUNTRY"
+        echo "country=$COUNTRY" >> $GITHUB_OUTPUT
+    
+    - name: Fetch Clean CIDRs
+      env:
+        COUNTRY: ${{ steps.country.outputs.country }}
+      run: |
+        echo "🚀 Running clean CIDR fetcher for $COUNTRY"
+        python scripts/fetch-clean-cidr.py
+    
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add cidr-ranges.txt clean-report.json
+        
+        if git diff --staged --quiet; then
+          echo "📝 No changes to commit"
+        else
+          TIMESTAMP=$(date +'%Y-%m-%d %H:%M:%S UTC')
+          git commit -m "🔄 Auto-update: ${{ steps.country.outputs.country }} clean CIDRs - $TIMESTAMP"
+          git push
+        fi
