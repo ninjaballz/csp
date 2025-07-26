@@ -15,6 +15,10 @@ on:
         required: false
         default: '30'
 
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   update-cidrs:
     runs-on: ubuntu-latest
@@ -22,6 +26,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
       
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -33,12 +39,24 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests
         
-    - name: Update CIDR ranges
+    - name: Verify files and run script
       env:
         COUNTRIES: ${{ github.event.inputs.countries || 'US,GB,DE,MY' }}
         TOTAL_CIDRS: ${{ github.event.inputs.total_cidrs || '50' }}
       run: |
-        python /scripts/check.py --countries "$COUNTRIES" --total-cidrs "$TOTAL_CIDRS" --quiet
+        echo "Current directory:"
+        pwd
+        echo "Files in current directory:"
+        ls -la
+        echo "Looking for check.py:"
+        find . -name "check.py" -type f
+        echo "Running script..."
+        if [ -f "check.py" ]; then
+          python check.py --countries "$COUNTRIES" --total-cidrs "$TOTAL_CIDRS" --quiet
+        else
+          echo "Error: check.py not found!"
+          exit 1
+        fi
         
     - name: Check if files changed
       id: verify-changed-files
