@@ -1,64 +1,68 @@
-name: Auto Clean CIDR Update
+name: Update Clean CIDRs
 
 on:
   schedule:
-    # Run every 10 minutes
-    - cron: '*/10 * * * *'
-  
-  push:
-    branches: [ main ]
-    paths:
-      - 'scripts/fetch-clean-cidr.py'
-  
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
   workflow_dispatch:
+    inputs:
+      countries:
+        description: 'Comma-separated country codes (e.g., US,GB,DE)'
+        required: false
+        default: 'US,GB,DE'
+      total_cidrs:
+        description: 'Total number of CIDRs to generate'
+        required: false
+        default: '30'
 
 jobs:
-  update-clean-cidrs:
+  update-cidrs:
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Setup Python
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.x'
-    
+        python-version: '3.9'
+        
     - name: Install dependencies
       run: |
-        pip install requests ipaddress
-    
-    - name: Select random country
-      id: country
-      run: |
-        # Rotate countries every 10 minutes
-        COUNTRIES=("US" "GB" "DE" "CA" "AU" "FR" "NL" "JP" "BR" "IN" "KR" "ES" "IT" "PL" "SE")
-        MINUTES=$(date +%M)
-        INDEX=$((MINUTES / 10 % ${#COUNTRIES[@]}))
-        COUNTRY=${COUNTRIES[$INDEX]}
-        echo "🌍 Selected country: $COUNTRY"
-        echo "country=$COUNTRY" >> $GITHUB_OUTPUT
-    
-    - name: Fetch Clean CIDRs
+        python -m pip install --upgrade pip
+        pip install requests
+        
+    - name: Update CIDR ranges
       env:
-        COUNTRY: ${{ steps.country.outputs.country }}
+        COUNTRIES: ${{ github.event.inputs.countries || 'CA,JP,ID,MY' }}
+        TOTAL_CIDRS: ${{ github.event.inputs.total_cidrs || '50' }}
       run: |
-        echo "🚀 Running clean CIDR fetcher for $COUNTRY"
-        python scripts/fetch-clean-cidr.py
-    
+        python check.py --countries "$COUNTRIES" --total-cidrs "$TOTAL_CIDRS" --quiet
+        
+    - name: Check if files changed
+      id: verify-changed-files
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+        
     - name: Commit and push changes
+      if: steps.verify-changed-files.outputs.changed == 'true'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add cidr-ranges.txt clean-report.json
+        git commit -m "🤖 Auto-update clean CIDRs for SMTP sending"
+        git push
         
-        if git diff --staged --quiet; then
-          echo "📝 No changes to commit"
-        else
-          TIMESTAMP=$(date +'%Y-%m-%d %H:%M:%S UTC')
-          git commit -m "🔄 Auto-update: ${{ steps.country.outputs.country }} clean CIDRs - $TIMESTAMP"
-          git push
-        fi
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: clean-cidrs
+        path: |
+          cidr-ranges.txt
+          clean-report.json
+        retention-days: 30
