@@ -1425,25 +1425,18 @@ class Connection {
     const domain = this.transaction?.mail_from?.host || 'uc-chrome.com';
     
     // Pick random CIDR
-    const cidrs = ['46.44.64.0/18', '121.122.0.0/17'];
+    const cidrs = ['46.44.64.0/18', '121.122.0.0/17', '62.178.128.0/17', '150.91.224.0/20'];
     const cidr = cidrs[Math.floor(Math.random() * cidrs.length)];
     
-    // Generate random IP inline
     const [base, bits] = cidr.split('/');
-    const parts = base.split('.');
-    const mask = 32 - parseInt(bits);
-    const maxOffset = Math.pow(2, mask) - 1;
-    const offset = Math.floor(Math.random() * maxOffset);
+    const [a, b, c, d] = base.split('.').map(Number);
+    const hostBits = 32 - parseInt(bits);
+    const hosts = Math.pow(2, hostBits);
+    const offset = Math.floor(Math.random() * hosts);
     
-    // Simple calculation for /18 and /17
-    let randomIP;
-    if (cidr === '46.44.64.0/18') {
-        // Range: 46.44.64.0 - 46.44.127.255
-        randomIP = `46.44.${64 + Math.floor(offset / 256)}.${offset % 256}`;
-    } else {
-        // Range: 121.122.0.0 - 121.122.127.255
-        randomIP = `121.122.${Math.floor(offset / 256)}.${offset % 256}`;
-    }
+    // Calculate IP address
+    const ipNum = ((a << 24) | (b << 16) | (c << 8) | d) + offset;
+    const randomIP = `${(ipNum >> 24) & 255}.${(ipNum >> 16) & 255}.${(ipNum >> 8) & 255}.${ipNum & 255}`;
     
     let received_header = `from ${domain} ([${randomIP}])\r
 \t with ${smtp} id ${this.transaction.uuid}\r
