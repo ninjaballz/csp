@@ -24,9 +24,9 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.11'
         
     - name: Install dependencies
       run: |
@@ -35,7 +35,7 @@ jobs:
         
     - name: Update CIDR ranges
       env:
-        COUNTRIES: ${{ github.event.inputs.countries || 'CA,JP,ID,MY' }}
+        COUNTRIES: ${{ github.event.inputs.countries || 'US,GB,DE,MY' }}
         TOTAL_CIDRS: ${{ github.event.inputs.total_cidrs || '50' }}
       run: |
         python check.py --countries "$COUNTRIES" --total-cidrs "$TOTAL_CIDRS" --quiet
@@ -59,7 +59,7 @@ jobs:
         git push
         
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: clean-cidrs
         path: |
