@@ -788,13 +788,13 @@ class Connection {
                     // RFC5321 section 4.2
                     // Hostname/domain should appear after the 220
                     greeting = [...cfg.message.greeting];
-                    greeting[0] = `msmx.au.com ESMTP ${greeting[0]}`;
+                    greeting[0] = `From Here to There ESMTP ${greeting[0]}`;
                     if (cfg.uuid.banner_chars) {
                         greeting[0] += ` (${this.uuid.substr(0, cfg.uuid.banner_chars)})`;
                     }
                 }
                 else {
-                    greeting = `msmx.au.com ESMTP Ready`;
+                    greeting = `From Here to There ESMTP Ready`;
                     if (cfg.uuid.banner_chars) {
                         greeting += ` (${this.uuid.substr(0, cfg.uuid.banner_chars)})`;
                     }
@@ -842,7 +842,7 @@ class Connection {
             default:
                 // RFC5321 section 4.1.1.1
                 // Hostname/domain should appear after 250
-                this.respond(250, `msmx.au.com Hello ${this.get_remote('host')}, ${cfg.message.helo}`);
+                this.respond(250, `Hello ${this.get_remote('host')}, ${cfg.message.helo}`);
         }
     }
     ehlo_respond (retval, msg) {
@@ -875,7 +875,7 @@ class Connection {
                 // Hostname/domain should appear after 250
 
                 const response = [
-                    `msmx.au.com Hello ${this.get_remote('host')}, ${cfg.message.helo}`,
+                    `Hello ${this.get_remote('host')}, ${cfg.message.helo}`,
                     "PIPELINING",
                     "8BITMIME",
                 ];
@@ -1417,35 +1417,24 @@ class Connection {
         if (this.tls.enabled) smtp += 'S';
         if (this.authheader) smtp += 'A';
 
-        // Generate timestamp
-        const date = new Date();
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        
-        // Format: Thu, 24 Jul 2025 00:09:25 +0900
-        const day = days[date.getUTCDay()];
-        const d = date.getUTCDate().toString().padStart(2, '0');
-        const mon = months[date.getUTCMonth()];
-        const year = date.getUTCFullYear();
-        const hours = date.getUTCHours().toString().padStart(2, '0');
-        const mins = date.getUTCMinutes().toString().padStart(2, '0');
-        const secs = date.getUTCSeconds().toString().padStart(2, '0');
-        
-        // For +0900 timezone (JST), add 9 hours
-        const jst_date = new Date(date.getTime() + (9 * 60 * 60 * 1000));
-        const jst_hours = jst_date.getUTCHours().toString().padStart(2, '0');
-        const formatted_date = `${day}, ${d} ${mon} ${year} ${jst_hours}:${mins}:${secs} +0900`;
+        let sslheader;
 
-        // Generate message ID: <20250723150925800.HBJY.46264.msmx.au.com@i1050.au.com>
-        const timestamp = date.toISOString().replace(/[-:T]/g, '').slice(0, 14) + date.getMilliseconds().toString().padStart(3, '0');
-        const random_part = Math.random().toString(36).substr(2, 4).toUpperCase();
-        const counter = Math.floor(Math.random() * 90000) + 10000;
-        const message_id = `<${timestamp}.${random_part}.${counter}.msmx.au.com@i1050.au.com>`;
+        if (this.get('tls.cipher.version')) {
+            // standardName appeared in Node.js v12.16 and v13.4
+            // RFC 8314
+            sslheader = `tls ${this.tls.cipher.standardName || this.tls.cipher.name}`;
+        }
 
-        // Format exactly as shown with proper spacing
-        let received_header = `from msmx.au.com by i1050.au.com with ${smtp}\r\n`;
-        received_header += `          id ${message_id};\r\n`;
-        received_header += `          ${formatted_date}`;
+        let received_header = `from ${this.hello.host} (${this.get_remote('info')})\r
+\t with ${smtp} id ${this.transaction.uuid}\r
+\tenvelope-from ${this.transaction.mail_from.format()}`;
+
+        if (sslheader)       received_header += `\r\n\t${sslheader.replace(/\r?\n\t?$/,'')}`
+
+        // Does not follow RFC 5321 section 4.4 grammar
+        if (this.authheader) received_header += ` ${this.authheader.replace(/\r?\n\t?$/, '')}`
+
+        received_header += `;\r\n\t${utils.date_to_str(new Date())}`
 
         return received_header;
     }
