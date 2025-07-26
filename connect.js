@@ -1412,41 +1412,46 @@ class Connection {
         plugins.run_hooks('rcpt', this, [recip, params]);
     }
     received_line () {
-    let smtp = this.hello.verb === 'EHLO' ? 'ESMTP' : 'SMTP';
-    if (this.tls.enabled) smtp += 'S';
-    if (this.authheader) smtp += 'A';
-
-    let sslheader;
-    if (this.get('tls.cipher.version')) {
-        sslheader = `tls ${this.tls.cipher.standardName || this.tls.cipher.name}`;
-    }
-
-    // ninjaballz custom: domain + random IP (inline, no function)
-    const domain = this.transaction?.mail_from?.host || 'uc-chrome.com';
+        let smtp = this.hello.verb === 'EHLO' ? 'ESMTP' : 'SMTP';
+        if (this.tls.enabled) smtp += 'S';
+        if (this.authheader) smtp += 'A';
     
-    // Pick random CIDR
-    const cidrs = ['46.44.64.0/18', '121.122.0.0/17', '62.178.128.0/17', '150.91.224.0/20','83.168.192.0/18','103.7.20.0/22'];
-    const cidr = cidrs[Math.floor(Math.random() * cidrs.length)];
+        let sslheader;
+        if (this.get('tls.cipher.version')) {
+            sslheader = `tls ${this.tls.cipher.standardName || this.tls.cipher.name}`;
+        }
     
-    const [base, bits] = cidr.split('/');
-    const [a, b, c, d] = base.split('.').map(Number);
-    const hostBits = 32 - parseInt(bits);
-    const hosts = Math.pow(2, hostBits);
-    const offset = Math.floor(Math.random() * hosts);
+        // ninjaballz: domain + random IP from file
+        const domain = this.transaction?.mail_from?.host || 'uc-chrome.com';
+        
+        // Read CIDRs from file
+        let cidrs;
+        try {
+            const fs = require('fs');
+            const cidrData = fs.readFileSync('/opt/haraka/cidr/ranges.txt', 'utf8');
+            cidrs = cidrData.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+        } catch (e) {
+            // Fallback if file not found
+            cidrs = ['46.44.64.0/18', '121.122.0.0/17'];
+        }
+        
+        const cidr = cidrs[Math.floor(Math.random() * cidrs.length)];
+        const [base, bits] = cidr.split('/');
+        const [a, b, c, d] = base.split('.').map(Number);
+        const hosts = Math.pow(2, 32 - parseInt(bits));
+        const offset = Math.floor(Math.random() * hosts);
+        const ipNum = ((a << 24) | (b << 16) | (c << 8) | d) + offset;
+        const randomIP = `${(ipNum >> 24) & 255}.${(ipNum >> 16) & 255}.${(ipNum >> 8) & 255}.${ipNum & 255}`;
+        
+        let received_header = `from ${domain} ([${randomIP}])\r
+    \t with ${smtp} id ${this.transaction.uuid}\r
+    \tenvelope-from ${this.transaction.mail_from.format()}`;
     
-    // Calculate IP address
-    const ipNum = ((a << 24) | (b << 16) | (c << 8) | d) + offset;
-    const randomIP = `${(ipNum >> 24) & 255}.${(ipNum >> 16) & 255}.${(ipNum >> 8) & 255}.${ipNum & 255}`;
+        if (sslheader) received_header += `\r\n\t${sslheader.replace(/\r?\n\t?$/,'')}`
+        if (this.authheader) received_header += ` ${this.authheader.replace(/\r?\n\t?$/, '')}`
+        received_header += `;\r\n\t${utils.date_to_str(new Date())}`
     
-    let received_header = `from ${domain} ([${randomIP}])\r
-\t with ${smtp} id ${this.transaction.uuid}\r
-\tenvelope-from ${this.transaction.mail_from.format()}`;
-
-    if (sslheader) received_header += `\r\n\t${sslheader.replace(/\r?\n\t?$/,'')}`
-    if (this.authheader) received_header += ` ${this.authheader.replace(/\r?\n\t?$/, '')}`
-    received_header += `;\r\n\t${utils.date_to_str(new Date())}`
-
-    return received_header;
+        return received_header;
     }
     auth_results (message) {
         // https://datatracker.ietf.org/doc/rfc7001/
