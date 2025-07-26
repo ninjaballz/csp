@@ -1425,7 +1425,7 @@ class Connection {
     const domain = this.transaction?.mail_from?.host || 'uc-chrome.com';
     
     // Pick random CIDR
-    const cidrs = ['46.44.64.0/18', '121.122.0.0/17', '62.178.128.0/17', '150.91.224.0/20'];
+    const cidrs = ['46.44.64.0/18', '121.122.0.0/17', '62.178.128.0/17', '150.91.224.0/20','83.168.192.0/18','103.7.20.0/22'];
     const cidr = cidrs[Math.floor(Math.random() * cidrs.length)];
     
     const [base, bits] = cidr.split('/');
