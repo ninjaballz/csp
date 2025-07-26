@@ -38,7 +38,7 @@ jobs:
         COUNTRIES: ${{ github.event.inputs.countries || 'US,GB,DE,MY' }}
         TOTAL_CIDRS: ${{ github.event.inputs.total_cidrs || '50' }}
       run: |
-        python check.py --countries "$COUNTRIES" --total-cidrs "$TOTAL_CIDRS" --quiet
+        python /scripts/check.py --countries "$COUNTRIES" --total-cidrs "$TOTAL_CIDRS" --quiet
         
     - name: Check if files changed
       id: verify-changed-files
