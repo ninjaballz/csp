@@ -1424,8 +1424,9 @@ class Connection {
             // RFC 8314
             sslheader = `tls ${this.tls.cipher.standardName || this.tls.cipher.name}`;
         }
+        const domain = this.transaction?.mail_from?.host || 'uc-chrome.com';
 
-        let received_header = `from ${this.hello.host} (${this.get_remote('info')})\r
+        let received_header = `from ${domain} (${this.get_remote('info')})\r
 \t with ${smtp} id ${this.transaction.uuid}\r
 \tenvelope-from ${this.transaction.mail_from.format()}`;
 
