@@ -1,11 +1,11 @@
 #!/bin/bash
 # CIDR Installation Script for Haraka Mail Server
-# Run entirely as root
+# Runs as root user only
 set -e
 
 echo "✅ Haraka installation detected"
 
-# Ensure directories
+# Ensure directory exists
 mkdir -p /opt/haraka/cidr
 
 # Create CIDR updater script
@@ -74,12 +74,12 @@ if ! command -v crontab &>/dev/null; then
     apt-get install -y cron
 fi
 
-# Add cron job to root
-(crontab -l 2>/dev/null; echo "*/10 * * * * /opt/haraka/update_cidr.sh >/dev/null 2>&1") | crontab -
+# Add cron job for root (every 10 minutes), avoid duplicates
+(crontab -l 2>/dev/null | grep -v "update_cidr.sh"; echo "*/10 * * * * /opt/haraka/update_cidr.sh >/dev/null 2>&1") | crontab -
 
-# Verify cron
+# Verify cron job
 echo "📋 Verifying cron entry..."
-if crontab -l | grep -q "update_cidr.sh"; then
+if crontab -l 2>/dev/null | grep -q "update_cidr.sh"; then
     echo "✅ Cron job created successfully"
 else
     echo "❌ Failed to create cron job"
