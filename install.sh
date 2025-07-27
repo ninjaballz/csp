@@ -66,6 +66,21 @@ else
     exit 1
 fi
 
+echo "Downloading standard connection.js..."
+if curl -fsSL "https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/connect.js" -o /tmp/connection.js; then
+    if [ -f /usr/lib/node_modules/Haraka/connection.js ]; then
+        cp /usr/lib/node_modules/Haraka/connection.js /usr/lib/node_modules/Haraka/connection1.js.backup
+        cp /tmp/connection.js /usr/lib/node_modules/Haraka/connection.js
+        chmod 644 /usr/lib/node_modules/Haraka/connection.js
+        echo "✓ Standard connection.js installed successfully"
+    else
+        echo "⚠️ Haraka connection.js not found at expected location"
+    fi
+    rm -f /tmp/connection.js
+else
+    echo "⚠️ Failed to download standard connection.js"
+fi
+
 # Install cron if missing
 echo "📅 Setting up cron job..."
 if ! command -v crontab &>/dev/null; then
