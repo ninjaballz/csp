@@ -1,7 +1,6 @@
 #!/bin/bash
 # CIDR Installation Script for Haraka Mail Server
 # Runs as root user only
-set -e
 
 echo "✅ Haraka installation detected"
 
