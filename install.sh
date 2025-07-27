@@ -3,18 +3,6 @@
 # This script sets up CIDR IP masking functionality
 set -e
 
-echo "🔧 Starting CIDR Installation..."
-
-# Check if Haraka is installed and running
-if ! systemctl is-active --quiet haraka; then
-    echo "❌ Haraka service is not running. Please install mail server first."
-    exit 1
-fi
-
-if [ ! -d "/opt/haraka" ]; then
-    echo "❌ Haraka directory not found. Please install mail server first."
-    exit 1
-fi
 
 echo "✅ Haraka installation detected"
 
@@ -113,62 +101,3 @@ fi
 # Ensure cron service is running
 systemctl enable cron
 systemctl start cron
-
-# Download and install custom connection.js with CIDR support
-echo "🔄 Installing CIDR-enabled connection.js..."
-if curl -fsSL "https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/connect.js" -o /tmp/connection.js; then
-    if [ -f /usr/lib/node_modules/Haraka/connection.js ]; then
-        # Backup original if not already backed up
-        if [ ! -f /usr/lib/node_modules/Haraka/connection.js.backup ]; then
-            cp /usr/lib/node_modules/Haraka/connection.js /usr/lib/node_modules/Haraka/connection.js.backup
-        fi
-        
-        # Install CIDR-enabled version
-        cp /tmp/connection.js /usr/lib/node_modules/Haraka/connection.js
-        chmod 644 /usr/lib/node_modules/Haraka/connection.js
-        rm -f /tmp/connection.js
-        echo "✅ CIDR-enabled connection.js installed"
-    else
-        echo "❌ Haraka connection.js not found at expected location"
-        exit 1
-    fi
-else
-    echo "❌ Failed to download CIDR-enabled connection.js"
-    exit 1
-fi
-
-# Restart Haraka service to apply changes
-echo "🔄 Restarting Haraka service..."
-systemctl restart haraka
-
-# Wait a moment and verify service is running
-sleep 3
-if systemctl is-active --quiet haraka; then
-    echo "✅ Haraka service restarted successfully"
-else
-    echo "❌ Haraka service failed to restart"
-    systemctl status haraka
-    exit 1
-fi
-
-# Show CIDR status
-echo ""
-echo "🎉 CIDR Installation Complete!"
-echo "📊 CIDR Status:"
-echo "   - CIDR directory: /opt/haraka/cidr"
-echo "   - Update script: /opt/haraka/update_cidr.sh"
-echo "   - Cron job: Every 10 minutes"
-echo "   - Log file: /opt/haraka/cidr/update.log"
-
-# Show current CIDR ranges count
-if [ -f /opt/haraka/cidr/ranges.txt ]; then
-    RANGE_COUNT=$(wc -l < /opt/haraka/cidr/ranges.txt)
-    echo "   - Current ranges: ${RANGE_COUNT} entries"
-else
-    echo "   - Current ranges: Not yet downloaded"
-fi
-
-echo ""
-echo "📝 To view CIDR logs: cat /opt/haraka/cidr/update.log"
-echo "🔧 To manually update: /opt/haraka/update_cidr.sh"
-echo "📋 To view cron jobs: crontab -u haraka -l"
