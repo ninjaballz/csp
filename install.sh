@@ -9,7 +9,6 @@ echo "✅ Haraka installation detected"
 # Create CIDR ranges directory
 echo "📁 Creating CIDR directory..."
 mkdir -p /opt/haraka/cidr
-chown -R haraka:haraka /opt/haraka/cidr
 
 # Create CIDR updater script with enhanced error handling
 echo "📝 Creating CIDR updater script..."
@@ -65,7 +64,6 @@ CIDR_EOF
 
 # Make script executable
 chmod +x /opt/haraka/update_cidr.sh
-chown haraka:haraka /opt/haraka/update_cidr.sh
 
 echo "✅ CIDR updater script created"
 
