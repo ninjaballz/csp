@@ -43,7 +43,6 @@ if curl -fsSL --max-time 30 --retry 3 --retry-delay 5 \
     if [ -s "${TEMP_FILE}" ] && grep -q "^[0-9]" "${TEMP_FILE}"; then
         mv "${TEMP_FILE}" "${CIDR_FILE}"
         chmod 644 "${CIDR_FILE}"
-        chown haraka:haraka "${CIDR_FILE}"
         log_msg "CIDR ranges updated successfully ($(wc -l < "${CIDR_FILE}") entries)"
         echo "✅ CIDR ranges updated: $(wc -l < "${CIDR_FILE}") entries"
     else
