@@ -835,8 +835,10 @@ def main():
         return
     
     # Write results - ONLY CIDRs in the main file
+    args.output = "cidr.txt"
+    
+    # Write results
     with open(args.output, 'w') as f:
-        # Write all CIDRs, no comments or headers
         for country in countries:
             if country in country_results:
                 for result in country_results[country]:
