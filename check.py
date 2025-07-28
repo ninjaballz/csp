@@ -583,7 +583,7 @@ For GitHub Actions:
     parser.add_argument(
         '--output', '-o',
         type=str,
-        default='cidr-ranges.txt',
+        default='cidr.txt',
         help='Output file for CIDR ranges (default: cidr-ranges.txt)'
     )
     
