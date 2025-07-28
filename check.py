@@ -371,7 +371,7 @@ def get_asns_by_country_name(country_code, quiet=False):
 
 def fetch_prefixes_for_asn(asn, quiet=False):
     """Fetch prefixes for ASN from BGPView"""
-    url = f"https://vector-astro-39.uniofemo.workers.dev/?url=https://api.bgpview.io/search?query_term=https://api.bgpview.io/asn/{asn}/prefixes"
+    url = f"https://vector-astro-39.uniofemo.workers.dev/?url=https://api.bgpview.io/asn/{asn}/prefixes"
     
     try:
         response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
