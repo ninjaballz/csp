@@ -85,7 +85,7 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add cidr-ranges.txt clean-report.json
+        git add cidr.txt clean-report.json
         git commit -m "🤖 Auto-update clean CIDRs for SMTP sending"
         git push
         
