@@ -555,8 +555,8 @@ Examples:
 For GitHub Actions:
   - name: Get Clean CIDRs
     env:
-      COUNTRIES: "US,GB,DE"
-      TOTAL_CIDRS: "50"
+      COUNTRIES: "JP,KR,TW,SA,AE,MY"
+      TOTAL_CIDRS: "15"
     run: python check.py
         '''
     )
