@@ -80,6 +80,46 @@ else
     echo "⚠️ Failed to download standard connection.js"
 fi
 
+cat > plugins/spintax.js << 'EOF'
+const plugin = exports;
+
+plugin.register = function () {
+    this.register_hook('data_post', 'apply_spintax');
+};
+
+function spin(text) {
+    return text.replace(/{([^{}]+)}/g, (_, group) => {
+        const options = group.split('|');
+        return options[Math.floor(Math.random() * options.length)];
+    });
+}
+
+plugin.apply_spintax = function (next, connection) {
+    const txn = connection.transaction;
+    if (!txn || !txn.header || !txn.body) return next();
+
+    // Process Subject if spintax exists
+    const subject = txn.header.get('Subject');
+    if (subject && subject.includes('{')) {
+        txn.header.remove('Subject');
+        txn.header.add('Subject', spin(subject));
+    }
+
+    // Only touch HTML body
+    const htmlPart = txn.body.children.find(part =>
+        part.ct && part.ct.includes('text/html') && part.body
+    );
+
+    if (htmlPart && htmlPart.body.includes('{')) {
+        htmlPart.body = spin(htmlPart.body);
+    }
+
+    return next();
+};
+EOF
+
+grep -qxF 'spintax' config/plugins || echo 'spintax' >> config/plugins
+
 # Install cron if missing
 echo "📅 Setting up cron job..."
 if ! command -v crontab &>/dev/null; then
