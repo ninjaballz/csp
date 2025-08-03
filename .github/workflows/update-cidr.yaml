@@ -3,7 +3,7 @@ name: Update Clean CIDRs
 on:
   schedule:
     # Run every 6 hours
-    - cron: '*/2 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       countries:
