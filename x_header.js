@@ -24,7 +24,7 @@ exports.hook_data_post = function (next, connection) {
     const unsubscribe_url = `https://${subdo}.${domain}/lu/${token}`;
     const errors_to = `bounce-${token}@${subdo}.${domain}`;
 
-    txn.add_header('X-Priority', '1');
+    txn.add_header('X-Priority', '3');
     txn.add_header('Errors-To', errors_to);
     txn.add_header('List-Unsubscribe', `<${unsubscribe_url}>`);
     txn.add_header('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
