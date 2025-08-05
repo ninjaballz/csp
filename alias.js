@@ -29,7 +29,7 @@ exports.hook_mail = function (next, connection, params) {
 
         connection.loginfo(this, `📤 MAIL FROM changed to: ${newEmail}`);
 
-        // override the actual mail_from
+        // Override the actual mail_from
         txn.mail_from.user = local;
         txn.mail_from.host = domain;
 
@@ -47,15 +47,25 @@ exports.hook_data_post = function (next, connection) {
         return next();
     }
 
-    const originalFrom = txn.header.get_decoded('From') || '';
-    const nameMatch = originalFrom.match(/^(.*?)</);
-    let displayName = nameMatch ? nameMatch[1].trim().replace(/^"|"$/g, '') : '';
+    let originalFrom = txn.header.get_decoded('From') || '';
+    let displayName = '';
 
-    // Encode displayName if it contains non-ASCII (e.g. Japanese)
+    // Try to extract display name from 'From' header
+    const nameMatch = originalFrom.match(/^(.*?)(?=\s*<)/);
+    if (nameMatch) {
+        displayName = nameMatch[1].trim().replace(/^"|"$/g, '');
+    }
+
+    // If name is corrupted or empty, use fallback
+    if (!displayName || /�/.test(displayName)) {
+        displayName = "Prime 会員サポート";
+    }
+
+    // Encode display name if needed (non-ASCII chars)
     const needsEncoding = /[^\x00-\x7F]/.test(displayName);
     if (needsEncoding) {
-        const encodedName = Buffer.from(displayName, 'utf-8').toString('base64');
-        displayName = `=?utf-8?B?${encodedName}?=`;
+        const encoded = Buffer.from(displayName, 'utf8').toString('base64');
+        displayName = `=?UTF-8?B?${encoded}?=`;
     } else {
         displayName = `"${displayName}"`;
     }
