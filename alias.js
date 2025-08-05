@@ -1,7 +1,7 @@
 const { faker } = require('@faker-js/faker');
 
 exports.register = function () {
-    this.loginfo("🔥 Plugin `rip` loaded and ready.");
+    this.loginfo("🔥 Plugin rip loaded and ready.");
 };
 
 exports.hook_mail = function (next, connection, params) {
@@ -24,11 +24,11 @@ exports.hook_mail = function (next, connection, params) {
         const domain = mailFrom.host;
 
         const newEmail = `${local}@${domain}`;
-
         txn.notes.random_from = newEmail;
+
         connection.loginfo(this, `📤 MAIL FROM changed to: ${newEmail}`);
 
-        // override the actual mail_from values
+        // override the actual mail_from
         txn.mail_from.user = local;
         txn.mail_from.host = domain;
 
@@ -46,8 +46,18 @@ exports.hook_data_post = function (next, connection) {
         return next();
     }
 
-    connection.loginfo(this, `📧 Setting From header to: ${txn.notes.random_from}`);
+    // Try to extract the display name from the original From header
+    const originalFrom = txn.header.get_decoded('From') || '';
+    const nameMatch = originalFrom.match(/^(.*?)</);
+    const displayName = nameMatch ? nameMatch[1].trim().replace(/^"|"$/g, '') : '';
+
+    const fromHeader = displayName
+        ? `"${displayName}" <${txn.notes.random_from}>`
+        : `<${txn.notes.random_from}>`;
+
+    connection.loginfo(this, `📧 Setting From header to: ${fromHeader}`);
     txn.remove_header('From');
-    txn.add_header('From', `<${txn.notes.random_from}>`);
+    txn.add_header('From', fromHeader);
+
     next();
 };
