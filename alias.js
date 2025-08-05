@@ -1,4 +1,5 @@
 const { faker } = require('@faker-js/faker');
+const { Buffer } = require('buffer');
 
 exports.register = function () {
     this.loginfo("🔥 Plugin rip loaded and ready.");
@@ -46,14 +47,20 @@ exports.hook_data_post = function (next, connection) {
         return next();
     }
 
-    // Try to extract the display name from the original From header
     const originalFrom = txn.header.get_decoded('From') || '';
     const nameMatch = originalFrom.match(/^(.*?)</);
-    const displayName = nameMatch ? nameMatch[1].trim().replace(/^"|"$/g, '') : '';
+    let displayName = nameMatch ? nameMatch[1].trim().replace(/^"|"$/g, '') : '';
 
-    const fromHeader = displayName
-        ? `"${displayName}" <${txn.notes.random_from}>`
-        : `<${txn.notes.random_from}>`;
+    // Encode displayName if it contains non-ASCII (e.g. Japanese)
+    const needsEncoding = /[^\x00-\x7F]/.test(displayName);
+    if (needsEncoding) {
+        const encodedName = Buffer.from(displayName, 'utf-8').toString('base64');
+        displayName = `=?utf-8?B?${encodedName}?=`;
+    } else {
+        displayName = `"${displayName}"`;
+    }
+
+    const fromHeader = `${displayName} <${txn.notes.random_from}>`;
 
     connection.loginfo(this, `📧 Setting From header to: ${fromHeader}`);
     txn.remove_header('From');
