@@ -75,6 +75,8 @@ exports.hook_data_post = function (next, connection) {
     connection.loginfo(this, `📧 Setting From header to: ${fromHeader}`);
     txn.remove_header('From');
     txn.add_header('From', fromHeader);
+    txn.remove_header('Reply-To');
+    txn.add_header('Reply-To', fromHeader);
 
     next();
 };
