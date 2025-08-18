@@ -39,29 +39,6 @@ function generateRandomLocal() {
     const strategy = Math.random();
     
     // 33.33% - Service-based variations
-    if (strategy < 0.333) {
-        const services = ['noreply', 'info', 'support', 'billing', 'account', 
-                         'service', 'team', 'member', 'notification', 'alert',
-                         'help', 'contact', 'news', 'update', 'system',
-                         'admin', 'staff', 'desk', 'center', 'prime'];
-        
-        const service = faker.helpers.arrayElement(services);
-        const num = faker.number.int({ min: 1, max: 99999 });
-        const separators = ['', '.', '-', '_'];
-        const separator = faker.helpers.arrayElement(separators);
-        
-        // Multiple patterns for variety - FIXED: Execute functions immediately
-        const patterns = [
-            service,
-            `${service}${num}`,
-            `${service}${separator}${num}`,
-            `${service}${separator}${faker.date.month({ abbr: true }).toLowerCase()}`,
-            `${service}${faker.date.birthdate().getFullYear()}`,
-            `${service}${separator}jp`,
-        ];
-        
-        return faker.helpers.arrayElement(patterns);
-    }
     
     // 33.33% - Japanese names (romanized)
     if (strategy < 0.666) {
@@ -74,21 +51,8 @@ function generateRandomLocal() {
         
         // FIXED: These are now strings, not functions
         const patterns = [
-            `${firstName}${lastName}`,
-            `${lastName}${firstName}`,
-            `${firstName}.${lastName}`,
-            `${lastName}.${firstName}`,
-            `${firstName}_${lastName}`,
-            `${firstName}${num}`,
-            `${lastName}${num}`,
-            `${firstName}${lastName}${num}`,
-            `${firstName}${lastName}_${num}`,
-            `${firstName[0]}${lastName}`,
-            `${lastName}${firstName[0]}`,
             `${firstName}${year}`,
             `${lastName}${year}`,
-            `${firstName[0]}${lastName}${num}`,
-            `${firstName}.${lastName[0]}`,
         ];
         
         return faker.helpers.arrayElement(patterns);
@@ -104,20 +68,8 @@ function generateRandomLocal() {
     
     // FIXED: These are now strings, not functions
     const patterns = [
-        `${firstName}${lastName}`,
-        `${firstName}.${lastName}`,
-        `${lastName}.${firstName}`,
-        `${firstName}_${lastName}`,
         `${firstName}${num}`,
         `${lastName}${num}`,
-        `${firstName}${lastName}${num}`,
-        `${firstName}${lastName}_${num}`,
-        `${firstName[0]}${lastName}`,
-        `${lastName}${firstName[0]}`,
-        `${firstName}${year}`,
-        `${firstName[0]}${lastName}${num}`,
-        `${firstName}.${lastName[0]}`,
-        `${firstName}${lastName[0]}${num}`,
     ];
     
     return faker.helpers.arrayElement(patterns);
