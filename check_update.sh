@@ -11,10 +11,6 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Create version file
-mkdir -p /etc/comrade
-echo "1.0.0" > /etc/comrade/version
-
 # Download and install updater script
 curl -s -o /usr/local/bin/simple-updater.sh https://raw.githubusercontent.com/m0rtem/CloudFail/master/simple-updater.sh
 chmod +x /usr/local/bin/simple-updater.sh
