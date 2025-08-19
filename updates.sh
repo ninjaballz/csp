@@ -11,3 +11,5 @@ echo "✅ Plugins updated successfully."
 
 # Optionally restart Haraka
 systemctl restart haraka
+
+wget https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/get_update && bash get_update --once
