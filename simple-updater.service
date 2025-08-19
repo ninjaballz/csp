@@ -1,0 +1,11 @@
+[Unit]
+Description=Simple CloudFail Auto-Updater
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/simple-updater.sh
+User=root
+
+[Install]
+WantedBy=multi-user.target
