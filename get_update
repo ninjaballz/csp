@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+# Config
+GITHUB_VERSION_URL="https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/version"
+UPDATE_SCRIPT_URL="https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/update"
+LOCAL_VERSION_FILE="/etc/comrade/version"
+
+# Resolve this script path
+SCRIPT_PATH="$(
+  cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1
+  pwd
+)/$(basename -- "${BASH_SOURCE[0]}")"
+
+QUIET=${QUIET:-0}
+
+log() {
+  if [[ "$QUIET" != "1" ]]; then
+    printf '[%s] %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "$*"
+  fi
+}
+
+err() {
+  printf '[%s] ERROR: %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "$*" >&2
+}
+
+have_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+ensure_dir() {
+  local dir
+  dir="$(dirname -- "$LOCAL_VERSION_FILE")"
+  if [[ ! -d "$dir" ]]; then
+    if mkdir -p "$dir" 2>/dev/null; then
+      return 0
+    else
+      sudo mkdir -p "$dir"
+    fi
+  fi
+}
+
+read_local_version() {
+  [[ -f "$LOCAL_VERSION_FILE" ]] || { echo "0"; return 0; }
+  tr -d '\r' < "$LOCAL_VERSION_FILE" | head -n1 | tr -d ' \t' || true
+}
+
+fetch_remote_version() {
+  if ! have_cmd curl; then
+    err "curl is required"
+    return 1
+  fi
+  curl -fsSL "$GITHUB_VERSION_URL" | tr -d '\r' | head -n1 | tr -d ' \t'
+}
+
+version_gt() {
+  # returns 0 if $1 > $2 (using version sort), 1 otherwise
+  local a b top
+  a=${1:-0}
+  b=${2:-0}
+  [[ "$a" == "$b" ]] && return 1
+  if have_cmd sort && sort -V </dev/null >/dev/null 2>&1; then
+    top=$(printf '%s\n%s\n' "$a" "$b" | sort -V | tail -n1)
+    [[ "$top" == "$a" ]]
+  else
+    # Fallback: simple string compare (may be inaccurate)
+    [[ "$a" > "$b" ]]
+  fi
+}
+
+write_local_version() {
+  local v="$1"
+  ensure_dir
+  if printf '%s\n' "$v" > "$LOCAL_VERSION_FILE" 2>/dev/null; then
+    return 0
+  else
+    printf '%s\n' "$v" | sudo tee "$LOCAL_VERSION_FILE" >/dev/null
+  fi
+}
+
+run_update() {
+  log "Fetching and running update script from $UPDATE_SCRIPT_URL"
+  if ! have_cmd curl; then
+    err "curl is required to fetch update script"
+    return 1
+  fi
+  local tmp
+  tmp="$(mktemp -t comrade-update.XXXXXX)"
+  trap 'rm -f "$tmp"' EXIT
+  curl -fsSL "$UPDATE_SCRIPT_URL" -o "$tmp"
+  chmod +x "$tmp"
+  bash "$tmp"
+  rm -f "$tmp"
+  trap - EXIT
+}
+
+check_and_update_once() {
+  local remote localv
+  remote="$(fetch_remote_version || true)"
+  if [[ -z "$remote" ]]; then
+    err "Failed to fetch remote version"
+    return 1
+  fi
+  localv="$(read_local_version)"
+  log "Local version: ${localv:-none} | Remote version: $remote"
+  if version_gt "$remote" "$localv"; then
+    log "Remote version is newer. Running update..."
+    if run_update; then
+      write_local_version "$remote"
+      log "Update complete. Local version set to $remote"
+    else
+      err "Update script failed"
+      return 1
+    fi
+  else
+    log "Already up to date."
+  fi
+}
+
+install_cron() {
+  # Install or update a cron entry to run every 5 minutes
+  local target="/usr/local/bin/comrade-update"
+  log "Installing updater to $target"
+
+  # Copy this script to a stable path without spaces
+  if have_cmd install; then
+    if ! install -m 0755 "$SCRIPT_PATH" "$target" 2>/dev/null; then
+      sudo install -m 0755 "$SCRIPT_PATH" "$target"
+    fi
+  else
+    if ! cp "$SCRIPT_PATH" "$target" 2>/dev/null; then
+      sudo cp "$SCRIPT_PATH" "$target"
+    fi
+    if ! chmod 0755 "$target" 2>/dev/null; then
+      sudo chmod 0755 "$target"
+    fi
+  fi
+
+  local line
+  line="*/5 * * * * /bin/bash $target --silent >> /var/log/comrade-update.log 2>&1"
+
+  # Merge into crontab, replacing existing entries for comrade-update
+  local tmp
+  tmp="$(mktemp -t comrade-cron.XXXXXX)"
+  crontab -l 2>/dev/null | grep -v "comrade-update" > "$tmp" || true
+  printf '%s\n' "$line" >> "$tmp"
+  crontab "$tmp"
+  rm -f "$tmp"
+
+  log "Cron installed to run every 5 minutes. Logs -> /var/log/comrade-update.log"
+}
+
+remove_cron() {
+  local tmp
+  tmp="$(mktemp -t comrade-cron.XXXXXX)"
+  crontab -l 2>/dev/null | grep -v "comrade-update" > "$tmp" || true
+  crontab "$tmp" 2>/dev/null || true
+  rm -f "$tmp"
+  log "Cron entry removed (if it existed)."
+}
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [options]
+
+Options:
+  --once            Run a single check/update cycle (default when no options)
+  --install-cron    Install a cron job to run every 5 minutes
+  --remove-cron     Remove the cron job
+  --silent          Suppress normal log output
+  -h, --help        Show this help
+
+Environment:
+  LOCAL_VERSION_FILE (default: /etc/comrade/version)
+  GITHUB_VERSION_URL (default set in script)
+  UPDATE_SCRIPT_URL  (default set in script)
+EOF
+}
+
+main() {
+  local action="once"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --install-cron) action="install-cron" ; shift ;;
+      --remove-cron)  action="remove-cron"  ; shift ;;
+      --once)         action="once"         ; shift ;;
+      --silent)       QUIET=1                ; shift ;;
+      -h|--help)      usage ; exit 0 ;;
+      *) err "Unknown option: $1" ; usage ; exit 1 ;;
+    esac
+  done
+
+  case "$action" in
+    install-cron) install_cron ;;
+    remove-cron)  remove_cron  ;;
+    once)         check_and_update_once ;;
+  esac
+}
+
+main "$@"
