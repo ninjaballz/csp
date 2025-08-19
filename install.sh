@@ -6,6 +6,8 @@ echo "✅ Haraka installation detected"
 
 # Ensure directory exists
 mkdir -p /opt/haraka/cidr
+sudo mkdir -p /etc/comrade
+echo "1.0.2" | sudo tee /etc/comrade/version > /dev/null
 
 # Create CIDR updater script
 echo "📝 Creating CIDR updater script..."
