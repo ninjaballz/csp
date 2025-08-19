@@ -1,0 +1,3 @@
+echo "1.2.1" > /etc/comrade/version
+
+
