@@ -43,7 +43,6 @@ exports.hook_data_post = function (next, connection) {
                     
                     // Apply all optimizations
                     html = optimizeHTML(html);
-                    html = addAntiSpamElements(html);
                     html = randomizeElements(html);
                     html = encodeSpecialChars(html);
                     html = replaceRecipientPlaceholders(html, txn, connection);
@@ -72,7 +71,6 @@ exports.hook_data_post = function (next, connection) {
             if (content.includes('<html') || content.includes('<HTML')) {
                 connection.loginfo(this, '📝 Processing root HTML body');
                 content = optimizeHTML(content);
-                content = addAntiSpamElements(content);
                 content = randomizeElements(content);
                 content = encodeSpecialChars(content);
                 content = replaceRecipientPlaceholders(content, txn, connection);
@@ -483,10 +481,6 @@ exports.hook_data = function (next, connection) {
     const txn = connection.transaction;
     if (!txn) return next();
 
-    // Pre-optimization headers
-    if (!txn.header.get('Content-Transfer-Encoding')) {
-        txn.add_header('Content-Transfer-Encoding', 'quoted-printable');
-    }
 
     next();
 };
