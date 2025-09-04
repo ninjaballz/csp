@@ -7,34 +7,31 @@ const crypto = require('crypto');
   Place your unsubscribe anchor manually in templates using {{UNSUB_URL}} or {{UNSUB_MAILTO}}.
   No footer or plain text block is injected.
 */
+
+const from = (txn.mail_from && txn.mail_from.address && txn.mail_from.address()) || '';
+if (!from.includes('@')) {
+  // fallback
+}
+
+const domainFull = from.split('@')[1].toLowerCase();
+
 const CONFIG = {
-    enableMicrodata: true,
-    enableImageOptimization: true,
-    enablePlainTextTuning: true,
-
-    // Unsubscribe / headers (set false if you do not even want headers)
-    enableListHeaders: true,
-    unsubscribeBaseURL: 'https://mail.example.com/unsub',   // Change to your domain
-    unsubscribeMailtoLocal: 'unsubscribe',                  // local part before @domain
-    unsubscribeMethod: 'One-Click',
-    unsubscribeSecret: process.env.UNSUB_SECRET || 'CHANGE_ME_SECRET', // Use a strong secret in production
-
-    // Provide a campaign identifier (stable short slug)
-    defaultCampaignId: 'general',
-
-    // Feedback-ID header (campaign:customer:type:domain) – keep consistent
-    enableFeedbackID: true,
-
-    // Hash headers (diagnostics only)
-    addBodyHashHeaders: false,
-
-    // Auto-Submitted only if system notifications (false for normal user mail)
-    setAutoSubmitted: false,
-
-    // Stable X-Mailer header
-    setStableMailerHeader: true,
-    mailerHeaderValue: 'Haraka-HTML-Optimizer/minimal-1.0',
+  enableMicrodata: true,
+  enableImageOptimization: true,
+  enablePlainTextTuning: true,
+  enableListHeaders: true,
+  unsubscribeBaseURL: `https://${domainFull}/unsub`,
+  unsubscribeMailtoLocal: 'unsubscribe',
+  unsubscribeMethod: 'One-Click',
+  unsubscribeSecret: process.env.UNSUB_SECRET || 'CHANGE_ME_SECRET',
+  defaultCampaignId: 'general',
+  enableFeedbackID: true,
+  addBodyHashHeaders: false,
+  setAutoSubmitted: false,
+  setStableMailerHeader: true,
+  mailerHeaderValue: 'DocomoMail',
 };
+
 
 // ------------------ Utility Functions ------------------
 function sha256(data) {
