@@ -102,7 +102,7 @@ function generatePersonBasedEmail() {
         `${firstName}${lastName}${faker.number.int({ min: 1, max: 999 })}`,
         `${firstName.charAt(0)}${lastName}`,
         `${lastName}${firstName.charAt(0)}`,
-        `${firstName}${faker.date.birthdate({ min: 1970, max: 2005 }).getFullYear()}`,
+        `${firstName}${faker.date.birthdate({ min: 1970, max: 2005, mode: 'year' }).getFullYear()}`,
         `${firstName.charAt(0)}${lastName}${faker.number.int({ min: 1, max: 99 })}`,
         `${firstName}${separator}${lastName.charAt(0)}`,
         `${firstName}${lastName.charAt(0)}${faker.number.int({ min: 1, max: 999 })}`,
@@ -131,8 +131,8 @@ function generateInternationalEmail() {
         `${firstName}${lastName}${faker.number.int({ min: 1, max: 999 })}`,
         `${firstName.charAt(0)}${lastName}`,
         `${lastName}${firstName.charAt(0)}`,
-        `${firstName}${faker.date.birthdate({ min: 1980, max: 2005 }).getFullYear()}`,
-        `${lastName}${faker.date.birthdate({ min: 1980, max: 2005 }).getFullYear()}`,
+        `${firstName}${faker.date.birthdate({ min: 1980, max: 2005, mode: 'year' }).getFullYear()}`,
+        `${lastName}${faker.date.birthdate({ min: 1980, max: 2005, mode: 'year' }).getFullYear()}`,
         `${firstName.charAt(0)}${lastName}${faker.number.int({ min: 1, max: 99 })}`,
         `${firstName}${separator}${lastName.charAt(0)}`,
         `${firstName}${lastName.charAt(0)}${faker.number.int({ min: 1, max: 999 })}`,
@@ -192,7 +192,7 @@ function generateCompanyEmail() {
         `${department}${separator}${buzzword}`,
         `${companyName.charAt(0)}${department}`,
         `${buzzword}${companyName.charAt(0)}`,
-        `${companyName}${faker.date.birthdate({ min: 2000, max: 2024 }).getFullYear()}`,
+        `${companyName}${faker.date.birthdate({ min: 2000, max: 2024, mode: 'year' }).getFullYear()}`,
         `${department}${separator}${cleanEmailLocal(faker.string.alpha({ length: 2 }))}`,
         `${buzzword}${separator}${cleanEmailLocal(faker.location.countryCode())}`
     ];
@@ -221,7 +221,7 @@ function generateInternetEmail() {
         `${username.charAt(0)}${displayName}`,
         `${displayName}${username.charAt(0)}`,
         `${domainWord}${username.charAt(0)}`,
-        `${username}${faker.date.birthdate({ min: 1990, max: 2010 }).getFullYear()}`,
+        `${username}${faker.date.birthdate({ min: 1990, max: 2010, mode: 'year' }).getFullYear()}`,
         `${displayName}${separator}${cleanEmailLocal(faker.string.alphanumeric({ length: 2 }))}`
     ];
     
@@ -249,7 +249,7 @@ function generateProductEmail() {
         `${product.charAt(0)}${material}`,
         `${productName}${product.charAt(0)}`,
         `${material}${productName.charAt(0)}`,
-        `${product}${faker.date.birthdate({ min: 2010, max: 2024 }).getFullYear()}`,
+        `${product}${faker.date.birthdate({ min: 2010, max: 2024, mode: 'year' }).getFullYear()}`,
         `${productName}${separator}${cleanEmailLocal(faker.string.alpha({ length: 2 }))}`
     ];
     
@@ -420,4 +420,3 @@ exports.hook_data_post = function (next, connection) {
 
     next();
 };
-
