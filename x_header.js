@@ -48,7 +48,7 @@ const CONFIG = {
   unsubscribeSecret: process.env.UNSUB_SECRET || 'CHANGE_ME_TO_LONG_RANDOM_SECRET',
   unsubscribePathMode: 'path',     // 'path' or 'query'
   unsubTimeBucketHours: 1,         // rotate token hourly
-  perSendUnsubToken: false,        // true to force unique per message
+  perSendUnsubToken: true,        // true to force unique per message
   listIdLocalPart: 'newsletter',   // List-ID local part
   campaignId: 'general',           // for Feedback-ID
   customerId: 'default',
@@ -62,7 +62,7 @@ const CONFIG = {
   // Subject config
   maxEncodedWordLength: 75,
   xMailer: 'UnifiedMailer/1.0',
-  setStableMailerHeader: true,
+  setStableMailerHeader: false,
 
   // Placeholders
   enableRecipientPlaceholders: true,
