@@ -5,6 +5,3 @@ postconf -e "mydestination =" "virtual_alias_domains =" "virtual_alias_maps =" "
 
 # Stop and disable OpenDKIM
 sudo systemctl stop opendkim && sudo systemctl disable opendkim
-
-# Verify port 8891 is no longer listening
-sudo ss -ltnp | grep 8891 || echo "✅ OpenDKIM disabled, nothing on 8891"
