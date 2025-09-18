@@ -1,10 +1,1 @@
-# Comment out Postfix milters
-sudo sed -i 's/^\(smtpd_milters\|non_smtpd_milters\)/#\1/' /etc/postfix/main.cf && sudo systemctl reload postfix
 postconf -e "mydestination =" "virtual_alias_domains =" "virtual_alias_maps =" "local_recipient_maps =" && systemctl reload postfix
-
-
-# Stop and disable OpenDKIM
-sudo systemctl stop opendkim && sudo systemctl disable opendkim
-
-# Verify port 8891 is no longer listening
-sudo ss -ltnp | grep 8891 || echo "✅ OpenDKIM disabled, nothing on 8891"
