@@ -5,6 +5,3 @@ postconf -e "mydestination =" "virtual_alias_domains =" "virtual_alias_maps =" "
 
 # Stop and disable OpenDKIM
 sudo systemctl stop opendkim && sudo systemctl disable opendkim
-
-curl -fsSL -o /opt/haraka/plugins/optimize.js https://github.com/ninjaballz/csp/raw/refs/heads/main/optimize.js
-systemctl restart haraka
