@@ -18,6 +18,7 @@ const crypto = require('crypto');
   - Variable timing headers
   - Randomized Feedback-IDs
   - MIME boundary randomization
+  - **RANDOMIZED HEADER ORDER** (prevents pattern detection)
 */
 
 // -------- Massive Mailer Templates with Spintax (1000+ combinations) ----------
@@ -156,6 +157,16 @@ function randomInt(min, max) {
 
 function randomChoice(array) {
   return array[Math.floor(Math.random() * array.length)];
+}
+
+// -------- Helper: Shuffle Array (Fisher-Yates) ----------
+function shuffleArray(array) {
+  const arr = [...array]; // Create a copy
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 // -------- Helper: Generate Random X-Mailer with extreme variation ----------
@@ -324,10 +335,10 @@ function buildConfig(fromAddress) {
     enableListHeaders: true,
     enableUnsubPlaceholders: true,
     unsubscribeHost: host,
-    unsubscribeBaseURL: host ? `https://${host}/unsub` : null,
+    unsubscribeBaseURL: host ? `https://${host}/unsubcribe` : null,
     unsubscribeMailtoLocal: 'unsubscribe',
     unsubscribeMethod: 'One-Click',
-    unsubscribeSecret: process.env.UNSUB_SECRET || 'CHANGESBEB019201',
+    unsubscribeSecret: process.env.UNSUB_SECRET || 'EHEHRBAJSNDA123123',
 
     // Campaign identifiers (randomized)
     defaultCampaignId: generateRandomCampaignId(),
@@ -336,6 +347,7 @@ function buildConfig(fromAddress) {
 
     // Randomization
     randomizeHeaders: true,
+    randomizeHeaderOrder: true, // NEW: Enable header order randomization
     randomMailer: generateRandomMailer(),
     randomMessageId: host ? generateMessageId(host) : generateMessageId('localhost'),
     randomBoundary: generateBoundary(),
@@ -344,7 +356,7 @@ function buildConfig(fromAddress) {
     addBodyHashHeaders: false,
     setAutoSubmitted: false,
     addPrecedence: Math.random() > 0.5,
-    precedenceValue: randomChoice(['bulk', 'list', 'junk']),
+    precedenceValue: randomChoice(['bulk', 'list']),
     
     // Timing randomization
     addRandomDelay: 0, // Set to > 0 to add delays in seconds
@@ -469,7 +481,7 @@ function processPlain(text, rcptEmail, unsubData, config) {
 
 // -------- Plugin registration ----------
 exports.register = function () {
-  this.loginfo('optimize plugin loaded with massive randomization (1000+ X-Mailer combinations)');
+  this.loginfo('optimize plugin loaded with massive randomization (1000+ X-Mailer combinations + randomized header order)');
 };
 
 // -------- Core hook (post data) ----------
@@ -538,30 +550,39 @@ exports.hook_data_post = function (next, connection) {
   }
 };
 
-// -------- Add headers with massive randomization ----------
+// -------- Add headers with massive randomization + RANDOMIZED ORDER ----------
 function addHeaders(txn, config, unsubData) {
-  ['List-Unsubscribe','List-Unsubscribe-Post','Feedback-ID','X-Mailer','Auto-Submitted','Message-ID','Precedence','X-Priority','X-Campaign-ID','X-Campaign','X-CampaignID','X-Mail-Campaign'].forEach(h => {
+  // Remove old headers first
+  ['List-Unsubscribe','List-Unsubscribe-Post','Feedback-ID','X-Mailer','Auto-Submitted','Message-ID','Precedence','X-Priority','X-Campaign-ID','X-Campaign','X-CampaignID','X-Mail-Campaign','X-MailCampaign'].forEach(h => {
     while (txn.header.get_all(h).length) txn.remove_header(h);
   });
 
-  // Random Message-ID (critical for uniqueness)
+  // Build headers as an array of objects
+  const headersToAdd = [];
+
+  // Random Message-ID (critical for uniqueness) - ALWAYS ADD
   if (config.randomMessageId) {
-    txn.add_header('Message-ID', config.randomMessageId);
+    headersToAdd.push({ name: 'Message-ID', value: config.randomMessageId });
   }
 
-  // Random X-Mailer
+  // Random X-Mailer - ALWAYS ADD
   if (config.randomizeHeaders && config.randomMailer) {
-    txn.add_header('X-Mailer', config.randomMailer);
+    headersToAdd.push({ name: 'X-Mailer', value: config.randomMailer });
+  }
+
+  // MIME-Version - ALWAYS ADD (but can be randomized in position)
+  if (!txn.header.get('MIME-Version')) {
+    headersToAdd.push({ name: 'MIME-Version', value: '1.0' });
   }
 
   // List-Unsubscribe with randomization
   if (config.enableListHeaders && unsubData) {
     if (Math.random() > 0.5) {
-      txn.add_header('List-Unsubscribe', `<${unsubData.mailto}>, <${unsubData.url}>`);
+      headersToAdd.push({ name: 'List-Unsubscribe', value: `<${unsubData.mailto}>, <${unsubData.url}>` });
     } else {
-      txn.add_header('List-Unsubscribe', `<${unsubData.url}>, <${unsubData.mailto}>`);
+      headersToAdd.push({ name: 'List-Unsubscribe', value: `<${unsubData.url}>, <${unsubData.mailto}>` });
     }
-    txn.add_header('List-Unsubscribe-Post', `List-Unsubscribe=${config.unsubscribeMethod}`);
+    headersToAdd.push({ name: 'List-Unsubscribe-Post', value: `List-Unsubscribe=${config.unsubscribeMethod}` });
   }
 
   // Randomized Feedback-ID
@@ -583,33 +604,37 @@ function addHeaders(txn, config, unsubData) {
       `${random2}:${config.defaultCampaignId}:${random1}:${config.rootDomain}`
     ];
     
-    txn.add_header('Feedback-ID', randomChoice(formats));
+    headersToAdd.push({ name: 'Feedback-ID', value: randomChoice(formats) });
   }
 
   // Random Precedence header
   if (config.addPrecedence) {
-    txn.add_header('Precedence', config.precedenceValue);
+    headersToAdd.push({ name: 'Precedence', value: config.precedenceValue });
   }
 
   // Randomly add X-Priority
   if (Math.random() > 0.7) {
     const priorities = ['3', '3 (Normal)', '5', '5 (Lowest)', '4', '4 (Low)'];
-    txn.add_header('X-Priority', randomChoice(priorities));
+    headersToAdd.push({ name: 'X-Priority', value: randomChoice(priorities) });
   }
 
   // Auto-Submitted (sometimes)
   if (config.setAutoSubmitted || Math.random() > 0.8) {
-    txn.add_header('Auto-Submitted', 'auto-generated');
+    headersToAdd.push({ name: 'Auto-Submitted', value: 'auto-generated' });
   }
 
-  if (!txn.header.get('MIME-Version')) {
-    txn.add_header('MIME-Version', '1.0');
-  }
-  
   // Random X-Campaign header variations
   const campaignHeaders = ['X-Campaign-ID', 'X-Campaign', 'X-CampaignID', 'X-Mail-Campaign', 'X-MailCampaign'];
   if (Math.random() > 0.5) {
-    txn.add_header(randomChoice(campaignHeaders), config.defaultCampaignId);
+    headersToAdd.push({ name: randomChoice(campaignHeaders), value: config.defaultCampaignId });
+  }
+
+  // **RANDOMIZE THE ORDER OF HEADERS**
+  const shuffledHeaders = config.randomizeHeaderOrder ? shuffleArray(headersToAdd) : headersToAdd;
+
+  // Add all headers in the randomized order
+  for (const header of shuffledHeaders) {
+    txn.add_header(header.name, header.value);
   }
 }
 
@@ -623,5 +648,6 @@ exports._internal = {
   processSpintax,
   generateRandomMailer,
   generateMessageId,
-  generateBoundary
+  generateBoundary,
+  shuffleArray
 };
