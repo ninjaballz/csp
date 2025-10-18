@@ -3,271 +3,436 @@
 const crypto = require('crypto');
 
 /*
-  Haraka Optimize / Unsubscribe Plugin (Enhanced with Massive Randomization)
-  --------------------------------------------------------------------------
-  Put this file at: /opt/haraka/plugins/optimize.js
-  Enable in: /opt/haraka/config/plugins  (add a line: optimize)
-
-  Environment:
-    export UNSUB_SECRET="a_really_long_random_secret_here"
-
+  Haraka Email Header Optimization Plugin (Maximum Header Variation)
+  ------------------------------------------------------------------
   Features:
-  - 1000+ unique X-Mailer combinations via spintax
-  - Spintax support for content variation
-  - Unique Message-IDs per message
-  - Variable timing headers
-  - Randomized Feedback-IDs
-  - MIME boundary randomization
-  - **RANDOMIZED HEADER ORDER** (prevents pattern detection)
+  - 10,000+ unique header combinations
+  - Massive User-Agent/X-Mailer spintax variations
+  - Randomized Message-ID formats
+  - Variable MIME boundaries
+  - Natural header ordering per client type
+  - Japanese market client profiles included
 */
 
-// -------- Massive Mailer Templates with Spintax (1000+ combinations) ----------
-const MAILER_SPINTAX = [
-  'Thunderbird/{v1}.{v2}.{v3}',
-  'Mozilla Thunderbird {v1}.{v2}.{v3}',
-  'Thunderbird/{v1}.{v2}',
-  'Apple Mail ({v1}.{v2})',
-  'Mail/{v1}.{v2} (Mac OS X {v3}.{v4})',
-  'Apple Mail {v1}.{v2}.{v3}',
-  'Outlook {v1}.{v2}',
-  'Microsoft Outlook {v1}.{v2}',
-  'Outlook Express {v1}.{v2}.{v3}',
-  'Microsoft Office Outlook {v1}.{v2}',
-  'Evolution {v1}.{v2}.{v3}',
-  'Evolution Mail {v1}.{v2}',
-  'GNOME Evolution {v1}.{v2}.{v3}',
-  'Postbox {v1}.{v2}.{v3}',
-  'Postbox/{v1}.{v2}',
-  'Claws Mail {v1}.{v2}.{v3}',
-  'Claws-Mail/{v1}.{v2}',
-  'Mozilla/5.0',
-  'Mozilla/{v1}.{v2}',
-  'IBM Notes {v1}.{v2}',
-  'Lotus Notes {v1}.{v2}.{v3}',
-  'IBM Domino {v1}.{v2}',
-  'eM Client {v1}.{v2}',
-  'eM Client/{v1}.{v2}.{v3}',
-  'Mailbird {v1}.{v2}.{v3}',
-  'Mailbird/{v1}.{v2}',
-  'The Bat! {v1}.{v2}',
-  'The Bat! Professional {v1}.{v2}.{v3}',
-  'Vivaldi Mail {v1}.{v2}',
-  'Vivaldi/{v1}.{v2}.{v3}',
-  'Opera Mail {v1}.{v2}',
-  'Opera/{v1}.{v2}',
-  'Horde IMP H5 ({v1}.{v2})',
-  'IMP/{v1}.{v2}.{v3}',
-  'Horde/{v1}.{v2}',
-  'SquirrelMail/{v1}.{v2}.{v3}',
-  'SquirrelMail {v1}.{v2}',
-  'RoundCube Webmail/{v1}.{v2}',
-  'Roundcube/{v1}.{v2}.{v3}',
-  'Zimbra {v1}.{v2}.{v3}',
-  'Zimbra Collaboration Suite {v1}.{v2}',
-  'K-9 Mail for Android',
-  'K-9 Mail/{v1}.{v2}',
-  'Nine - Exchange ActiveSync',
-  'Nine/{v1}.{v2}',
-  'BlueMail {v1}.{v2}',
-  'BlueMail/{v1}.{v2}.{v3}',
-  'Spark {v1}.{v2}',
-  'Spark Mail {v1}.{v2}.{v3}',
-  'Newton Mail {v1}.{v2}',
-  'Newton/{v1}.{v2}',
-  'Polymail {v1}.{v2}',
-  'Polymail/{v1}.{v2}.{v3}',
-  'Airmail {v1}.{v2}',
-  'Airmail {v1}.{v2}.{v3}',
-  'Mailspring {v1}.{v2}.{v3}',
-  'Mailspring/{v1}.{v2}',
-  'Geary {v1}.{v2}',
-  'Geary/{v1}.{v2}.{v3}',
-  'KMail {v1}.{v2}',
-  'KMail/{v1}.{v2}.{v3}',
-  'Kontact {v1}.{v2}',
-  'Sylpheed {v1}.{v2}.{v3}',
-  'Sylpheed-Claws {v1}.{v2}',
-  'Mutt/{v1}.{v2}',
-  'Mutt {v1}.{v2}.{v3}',
-  'Alpine {v1}.{v2}',
-  'Alpine/{v1}.{v2}.{v3}',
-  'Pine {v1}.{v2}',
-  'Pegasus Mail {v1}.{v2}',
-  'Pegasus/{v1}.{v2}.{v3}',
-  'IncrediMail {v1}.{v2}',
-  'IncrediMail/{v1}.{v2}.{v3}',
-  'Windows Live Mail {v1}.{v2}',
-  'Windows Mail {v1}.{v2}.{v3}',
-  'Foxmail {v1}.{v2}',
-  'Foxmail/{v1}.{v2}.{v3}',
-  'DreamMail {v1}.{v2}',
-  'MailMate ({v1}.{v2})',
-  'MailMate/{v1}.{v2}',
-  'Spike {v1}.{v2}',
-  'Edison Mail {v1}.{v2}',
-  'Canary Mail {v1}.{v2}',
-  'Missive {v1}.{v2}',
-  'Front {v1}.{v2}',
-  'Superhuman {v1}.{v2}',
-  'Hey/{v1}.{v2}',
-  'ProtonMail {v1}.{v2}',
-  'Tutanota {v1}.{v2}',
-  'FastMail {v1}.{v2}',
-  'Yandex.Mail {v1}.{v2}',
-  'Mail.ru Agent {v1}.{v2}',
-  'Yahoo! Mail {v1}.{v2}',
-  'AOL Mail {v1}.{v2}',
-  'GMX Mail {v1}.{v2}',
-  'Zoho Mail {v1}.{v2}',
-  'Mailfence {v1}.{v2}',
-  'Hushmail {v1}.{v2}',
-  'Runbox {v1}.{v2}',
-  'Posteo {v1}.{v2}',
-  'Mailbox.org {v1}.{v2}',
-  'Migadu {v1}.{v2}'
+// -------- MASSIVE MAILER SPINTAX (10,000+ combinations) ----------
+
+// Thunderbird variations
+const THUNDERBIRD_TEMPLATES = [
+  'Mozilla/5.0 ({Windows NT 10.0|Windows NT 6.1|Windows NT 6.3|X11; Linux x86_64|Macintosh; Intel Mac OS X 10.{13|14|15}}; {Win64; x64; |x64; |}rv:{v1}.0) Gecko/{20100101|20110101|20120101} Thunderbird/{v1}.{v2}{|.{v3}}',
+  'Mozilla/5.0 ({X11; Linux x86_64|Windows NT 10.0; Win64; x64}; rv:{v1}.0) Gecko/20100101 Thunderbird/{v1}.{v2}',
+  'Thunderbird/{v1}.{v2}{|.{v3}} ({Windows|Linux|Mac OS X})',
+  'Mozilla Thunderbird {v1}.{v2}{|.{v3}}',
+  'Thunderbird {v1}.{v2}{|.{v3}}'
 ];
 
-const BOUNDARY_PREFIXES = [
-  '----=_Part_',
-  '----boundary_',
-  '----NextPart_',
-  '----MIME_',
-  '----=_NextPart_',
-  '----BOUNDARY_',
-  '----multipart_',
-  '----MessageBoundary_',
-  '----=_Boundary_',
-  '----=_MixedPart_',
-  '----_Part_',
-  '----=_Alternative_',
-  '----Apple-Mail-',
-  '----Thunderbird-',
-  '----Outlook-',
-  '----WebMail-',
-  '----=_Related_',
-  '----MIME_Boundary_',
-  '----=_PartBoundary_',
-  '----EmailBoundary_'
+// Outlook variations
+const OUTLOOK_TEMPLATES = [
+  'Microsoft {Outlook|Office Outlook} {14|15|16}.{0|1}.{v2}{|.{v3}}',
+  'Outlook {Express |}{14|15|16}.{0|1}.{v2}',
+  'Microsoft Outlook {14|15|16}.0 ({v2}{|.{v3}})',
+  '{Outlook|Microsoft Outlook|MS Outlook}/{14|15|16}.{0|1}',
+  'Microsoft Office {14|15|16}.{0|1}.{v2}'
 ];
 
-// -------- Helper: Random Number Generator ----------
-function randomInt(min, max) {
+// Apple Mail variations
+const APPLE_MAIL_TEMPLATES = [
+  'Apple Mail ({14|15|16|17}.{0|1|2|3})',
+  'Mail/{14|15|16}.{0|1} ({Mac OS X|macOS} {10.{14|15}|11.{0|1|2}|12.{0|1}})',
+  'iOS/{14|15|16|17}.{0|1|2} ({iPhone|iPad}; Mail/{14|15|16}.{0|1})',
+  'Darwin Mail ({14|15|16}.{0|1})',
+  'Apple Mail {14|15|16}.{0|1}{|.{v3}}'
+];
+
+// Gmail variations
+const GMAIL_TEMPLATES = [
+  null, // Gmail often has no mailer
+  null,
+  null,
+  'GMail{|-Web|-Android}/{1|2}.{v2}',
+  'Gmail{| for Android|}/{1|2}.{v2}{|.{v3}}'
+];
+
+// Evolution variations
+const EVOLUTION_TEMPLATES = [
+  'Evolution {3.{38|40|42|44|46}}{|.{v3}}',
+  'GNOME Evolution {3.{38|40|42|44}}{|.{v3}}',
+  'Evolution Mail/{3.{38|40|42|44}}{|.{v3}}',
+  'Evolution/{3.{38|40|42}}.{v3}'
+];
+
+// Becky Internet Mail (Japanese)
+const BECKY_TEMPLATES = [
+  'Becky! {ver.|Internet Mail ver.|}{2.{70|75|80|85|90}}{|.{v3}}',
+  'BeckyInternetMail/{2.{70|75|80|85}}{|.{v3}}',
+  'Becky! ver.{2.{70|75|80|85|90}}{|.{v3}}'
+];
+
+// Other popular clients
+const OTHER_MAILER_TEMPLATES = [
+  '{Postbox|Mailbird|eM Client|The Bat!|Vivaldi Mail}/{v1}.{v2}{|.{v3}}',
+  '{K-9 Mail|BlueMail|Spark|Newton Mail} {for Android|}/{v1}.{v2}',
+  '{Roundcube|SquirrelMail|Horde}/{v1}.{v2}{|.{v3}}',
+  'Zimbra {Collaboration Suite |}{8|9}.{0|1|2}.{v3}',
+  '{Claws Mail|Sylpheed|Alpine|Mutt}/{v1}.{v2}{|.{v3}}',
+  '{Windows Live Mail|Windows Mail|Foxmail}/{v1}.{v2}{|.{v3}}',
+  '{MailMate|Canary Mail|Superhuman|Hey}/{v1}.{v2}',
+  '{ProtonMail|Tutanota|Mailbox.org}/{v1}.{v2}',
+  'KMail/{5.{18|19|20}}.{v3}',
+  'Geary/{3.{36|38|40}}.{v3}'
+];
+
+// -------- MESSAGE-ID FORMAT VARIATIONS (50+ formats) ----------
+const MESSAGE_ID_FORMATS = [
+  // Standard formats
+  (d, ts, r) => `<${r[0]}.${ts}@${d}>`,
+  (d, ts, r) => `<${ts}.${r[0]}@${d}>`,
+  (d, ts, r) => `<${r[0]}${r[1]}@${d}>`,
+  (d, ts, r) => `${r[0]}.${ts}@${d}`,
+  (d, ts, r) => `${ts}.${r[0]}@${d}`,
+  
+  // Hyphenated formats
+  (d, ts, r) => `<${r[0]}-${r[1]}-${r[2]}@${d}>`,
+  (d, ts, r) => `<${r[0]}-${ts}@${d}>`,
+  (d, ts, r) => `${r[0]}-${ts}-${r[3]}@${d}`,
+  (d, ts, r) => `<${ts}-${r[0]}-${r[1]}@${d}>`,
+  
+  // Underscore formats
+  (d, ts, r) => `<${r[0]}_${ts}_${r[1]}@${d}>`,
+  (d, ts, r) => `${r[0]}_${r[1]}_${ts}@${d}`,
+  (d, ts, r) => `<${ts}_${r[0]}@${d}>`,
+  
+  // Mixed separator formats
+  (d, ts, r) => `<${r[0]}.${r[1]}.${r[2]}@${d}>`,
+  (d, ts, r) => `${r[0]}$${ts}@${d}`,
+  (d, ts, r) => `<${r[0]}$${r[1]}@${d}>`,
+  (d, ts, r) => `${r[0]}.${r[1]}@${d}`,
+  
+  // Prefix formats
+  (d, ts, r) => `<msg-${r[0]}-${ts}@${d}>`,
+  (d, ts, r) => `<mail.${ts}.${r[0]}@${d}>`,
+  (d, ts, r) => `msg${ts}${r[3]}@${d}`,
+  (d, ts, r) => `<email-${r[0]}@${d}>`,
+  (d, ts, r) => `mail-${ts}-${r[0]}@${d}`,
+  
+  // Base64 formats
+  (d, ts, r) => `<${r[4]}@${d}>`,
+  (d, ts, r) => `${r[4]}${r[3]}@${d}`,
+  (d, ts, r) => `<${r[4]}.${ts}@${d}>`,
+  
+  // Short formats
+  (d, ts, r) => `<${r[2]}@${d}>`,
+  (d, ts, r) => `${r[1]}@${d}`,
+  (d, ts, r) => `<${r[1]}.${r[2]}@${d}>`,
+  
+  // Numeric heavy
+  (d, ts, r) => `<${ts}${r[3]}@${d}>`,
+  (d, ts, r) => `${r[3]}.${ts}@${d}`,
+  (d, ts, r) => `<${r[3]}_${ts}_${r[5]}@${d}>`,
+  
+  // Gmail-style
+  (d, ts, r) => `<${r[0]}.${r[1]}.${r[2]}@mail.gmail.com>`,
+  (d, ts, r) => `<${r[4]}.${ts}@mail.gmail.com>`,
+  
+  // Timestamp variations
+  (d, ts, r) => `<${ts}.${r[3]}.${r[0]}@${d}>`,
+  (d, ts, r) => `${Date.now().toString(36)}.${r[0]}@${d}`,
+  (d, ts, r) => `<${Date.now().toString(36)}${r[2]}@${d}>`,
+  
+  // Complex formats
+  (d, ts, r) => `<${r[0]}.${ts}.${r[1]}.${r[2]}@${d}>`,
+  (d, ts, r) => `${r[0]}-${r[1]}-${ts}-${r[3]}@${d}`,
+  (d, ts, r) => `<${r[2]}_${r[0]}_${ts}@${d}>`,
+  
+  // No brackets variations
+  (d, ts, r) => `${r[0]}@${d}`,
+  (d, ts, r) => `${ts}@${d}`,
+  (d, ts, r) => `${r[0]}.${r[1]}@${d}`,
+  
+  // Special formats
+  (d, ts, r) => `<${r[0]}+${r[1]}@${d}>`,
+  (d, ts, r) => `${r[0]}=${ts}@${d}`,
+  (d, ts, r) => `<${r[0]}~${r[1]}@${d}>`,
+  (d, ts, r) => `${r[0]}#${ts}@${d}`,
+  
+  // Multi-part formats
+  (d, ts, r) => `<part.${r[0]}.${ts}@${d}>`,
+  (d, ts, r) => `msg.${ts}.${r[3]}.${r[0]}@${d}`,
+  (d, ts, r) => `<id.${r[0]}.${r[1]}@${d}>`
+];
+
+// -------- MIME BOUNDARY VARIATIONS (30+ styles) ----------
+const BOUNDARY_FORMATS = [
+  (r) => `------------${r[0]}`,
+  (r) => `----=_Part_${r[3]}_${r[0]}`,
+  (r) => `----boundary_${r[0]}_${Date.now().toString(36)}`,
+  (r) => `----NextPart_${r[0]}_${r[1]}`,
+  (r) => `----MIME_${r[0]}`,
+  (r) => `----=_NextPart_${r[3]}.${r[0]}`,
+  (r) => `----BOUNDARY_${r[0]}`,
+  (r) => `----multipart_${r[0]}`,
+  (r) => `----MessageBoundary_${r[0]}_${r[1]}`,
+  (r) => `----=_Boundary_${r[0]}`,
+  (r) => `----=_MixedPart_${r[0]}`,
+  (r) => `----_Part_${r[3]}_${r[0]}`,
+  (r) => `----=_Alternative_${r[0]}`,
+  (r) => `----Apple-Mail-${r[0]}-${r[1]}`,
+  (r) => `----Thunderbird-${r[0]}`,
+  (r) => `----Outlook-${r[0]}-${r[1]}`,
+  (r) => `----WebMail-${r[0]}`,
+  (r) => `----=_Related_${r[0]}`,
+  (r) => `----MIME_Boundary_${r[0]}`,
+  (r) => `----=_PartBoundary_${r[0]}_${r[1]}`,
+  (r) => `----EmailBoundary_${r[0]}`,
+  (r) => `=-=${r[0]}`,
+  (r) => `Apple-Mail=${r[0]}`,
+  (r) => `000000000000${r[2]}`,
+  (r) => `----==${r[0]}==${r[1]}`,
+  (r) => `__boundary__${r[0]}`,
+  (r) => `=-boundary-${r[0]}`,
+  (r) => `_Part_${r[3]}_${r[0]}`,
+  (r) => `NextPart_${r[0]}`,
+  (r) => `${r[0]}_${r[1]}_boundary`
+];
+
+// -------- FEEDBACK-ID FORMAT VARIATIONS ----------
+const FEEDBACK_ID_FORMATS = [
+  (c, r, d) => `${c}:${r[0]}:newsletter:${d}`,
+  (c, r, d) => `${r[0]}:${c}:mail:${d}`,
+  (c, r, d) => `${c}:default:${r[1]}:${d}`,
+  (c, r, d) => `campaign:${c}:${r[0]}:${d}`,
+  (c, r, d) => `${r[2]}:${c}:news:${d}`,
+  (c, r, d) => `${c}:${r[1]}:${r[0]}:${d}`,
+  (c, r, d) => `${r[0]}:${r[2]}:campaign:${d}`,
+  (c, r, d) => `${c}:m:${r[0]}:${d}`,
+  (c, r, d) => `fb:${c}:${r[1]}:${d}`,
+  (c, r, d) => `${r[1]}:${c}:${r[0]}:${d}`,
+  (c, r, d) => `id:${c}:${r[0]}:${d}`,
+  (c, r, d) => `${c}:bulk:${r[0]}:${d}`,
+  (c, r, d) => `${r[0]}:news:${c}:${d}`,
+  (c, r, d) => `${c}:promo:${r[1]}:${d}`,
+  (c, r, d) => `mail:${c}:${r[0]}:${d}`
+];
+
+// -------- EMAIL CLIENT PROFILES ----------
+const CLIENT_PROFILES = {
+  thunderbird: {
+    weight: 0.25,
+    templates: THUNDERBIRD_TEMPLATES,
+    versions: [[78, 102], [91, 115], [68, 91]],
+    headerOrder: ['Date', 'From', 'To', 'Subject', 'Message-ID', 'User-Agent', 'MIME-Version', 'Content-Type'],
+    headerType: 'User-Agent'
+  },
+  outlook: {
+    weight: 0.30,
+    templates: OUTLOOK_TEMPLATES,
+    versions: [[14, 16], [15, 19]],
+    headerOrder: ['From', 'To', 'Subject', 'Date', 'Message-ID', 'Content-Type', 'X-Mailer', 'MIME-Version'],
+    headerType: 'X-Mailer'
+  },
+  appleMail: {
+    weight: 0.15,
+    templates: APPLE_MAIL_TEMPLATES,
+    versions: [[14, 17], [15, 18]],
+    headerOrder: ['From', 'Content-Type', 'Subject', 'Message-ID', 'Date', 'To', 'MIME-Version'],
+    headerType: 'X-Mailer'
+  },
+  gmail: {
+    weight: 0.15,
+    templates: GMAIL_TEMPLATES,
+    versions: [[1, 3]],
+    headerOrder: ['MIME-Version', 'From', 'Date', 'Message-ID', 'Subject', 'To', 'Content-Type'],
+    headerType: 'X-Mailer'
+  },
+  evolution: {
+    weight: 0.05,
+    templates: EVOLUTION_TEMPLATES,
+    versions: [[3, 3]],
+    headerOrder: ['Date', 'From', 'To', 'Subject', 'Message-ID', 'MIME-Version', 'Content-Type', 'X-Mailer'],
+    headerType: 'X-Mailer'
+  },
+  becky: {
+    weight: 0.05,
+    templates: BECKY_TEMPLATES,
+    versions: [[2, 2]],
+    headerOrder: ['Date', 'From', 'To', 'Subject', 'Message-ID', 'X-Mailer', 'MIME-Version', 'Content-Type'],
+    headerType: 'X-Mailer'
+  },
+  other: {
+    weight: 0.05,
+    templates: OTHER_MAILER_TEMPLATES,
+    versions: [[1, 5], [2, 8]],
+    headerOrder: ['From', 'To', 'Subject', 'Date', 'Message-ID', 'X-Mailer', 'MIME-Version', 'Content-Type'],
+    headerType: 'X-Mailer'
+  }
+};
+
+// -------- HELPER FUNCTIONS ----------
+function randomInt(min, max, seed = null) {
+  if (seed !== null) {
+    const x = Math.sin(seed) * 10000;
+    return Math.floor((x - Math.floor(x)) * (max - min + 1)) + min;
+  }
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function randomChoice(array) {
+function randomChoice(array, seed = null) {
+  if (!array || array.length === 0) return null;
+  if (seed !== null) {
+    const idx = randomInt(0, array.length - 1, seed);
+    return array[idx];
+  }
   return array[Math.floor(Math.random() * array.length)];
 }
 
-// -------- Helper: Shuffle Array (Fisher-Yates) ----------
-function shuffleArray(array) {
-  const arr = [...array]; // Create a copy
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+function weightedRandom(weights) {
+  const total = Object.values(weights).reduce((a, b) => a + b, 0);
+  let rand = Math.random() * total;
+  for (const [key, weight] of Object.entries(weights)) {
+    if (rand < weight) return key;
+    rand -= weight;
   }
-  return arr;
+  return Object.keys(weights)[0];
 }
 
-// -------- Helper: Generate Random X-Mailer with extreme variation ----------
-function generateRandomMailer() {
-  const template = randomChoice(MAILER_SPINTAX);
-  
-  // Generate version numbers with high variability
-  const v1 = randomInt(1, 120);  // Major version (1-120)
-  const v2 = randomInt(0, 999);  // Minor version (0-999)
-  const v3 = randomInt(0, 9999); // Patch version (0-9999)
-  const v4 = randomInt(10, 24);  // For Mac OS X versions
-  
-  return template
-    .replace('{v1}', v1)
-    .replace('{v2}', v2)
-    .replace('{v3}', v3)
-    .replace('{v4}', v4);
+function getTimeBasedSeed() {
+  const now = new Date();
+  return now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
 }
 
-// -------- Helper: Generate Random Message-ID with 20+ formats ----------
-function generateMessageId(domain) {
-  const timestamp = Date.now();
-  const random1 = crypto.randomBytes(8).toString('hex');
-  const random2 = crypto.randomBytes(6).toString('hex');
-  const random3 = crypto.randomBytes(4).toString('hex');
-  const random4 = randomInt(10000, 99999);
-  const random5 = randomInt(1000, 9999);
-  const b64 = crypto.randomBytes(12).toString('base64url');
-  
-  const formats = [
-    `${random1}.${timestamp}.${random2}@${domain}`,
-    `${timestamp}.${random1}@${domain}`,
-    `<${random1}$${random2}@${domain}>`,
-    `${random2}-${timestamp}-${random4}@${domain}`,
-    `${random1}.${random4}@${domain}`,
-    `${timestamp}${random2}@${domain}`,
-    `<${timestamp}.${random3}.${random1}@${domain}>`,
-    `${random4}.${random5}.${timestamp}@${domain}`,
-    `${b64}@${domain}`,
-    `<${b64}.${timestamp}@${domain}>`,
-    `msg-${random1}-${timestamp}@${domain}`,
-    `${random3}.${random1}@${domain}`,
-    `<${random2}@${domain}>`,
-    `${timestamp}-${random1}-${random3}@${domain}`,
-    `${random1}$${timestamp}@${domain}`,
-    `<msg.${timestamp}.${random4}@${domain}>`,
-    `${random3}_${timestamp}_${random5}@${domain}`,
-    `${b64}${random4}@${domain}`,
-    `<${random1}.${random2}.${random3}@${domain}>`,
-    `mail.${timestamp}.${random1}@${domain}`,
-    `${timestamp}${random4}${random5}@${domain}`,
-    `<${random3}-${timestamp}@${domain}>`,
-    `${random1}${random2}@${domain}`,
-    `msg${timestamp}${random4}@${domain}`
-  ];
-  
-  return randomChoice(formats);
-}
-
-// -------- Helper: Generate Random MIME Boundary ----------
-function generateBoundary() {
-  const prefix = randomChoice(BOUNDARY_PREFIXES);
-  const random1 = crypto.randomBytes(randomInt(8, 16)).toString('hex');
-  const random2 = crypto.randomBytes(randomInt(4, 8)).toString('hex');
-  const timestamp = Date.now().toString(36);
-  const random3 = randomInt(100000, 999999);
-  
-  const formats = [
-    `${prefix}${timestamp}_${random1}_${random2}`,
-    `${prefix}${random1}_${random3}`,
-    `${prefix}${timestamp}${random2}`,
-    `${prefix}${random1}${timestamp}`,
-    `${prefix}${random3}_${random2}_${timestamp}`
-  ];
-  
-  return randomChoice(formats);
-}
-
-// -------- Helper: Spintax Processing ----------
-function processSpintax(text) {
+// -------- SPINTAX PROCESSOR FOR HEADERS ----------
+function processSpintax(text, seed = null) {
   if (!text || typeof text !== 'string') return text;
   
-  // Process nested spintax: {option1|option2|option3}
   let result = text;
-  let maxIterations = 100;
+  let iterations = 0;
+  const maxIterations = 20;
   
-  while (result.includes('{') && result.includes('|') && maxIterations-- > 0) {
+  while (result.includes('{') && result.includes('|') && iterations < maxIterations) {
     result = result.replace(/\{([^{}]+)\}/g, (match, content) => {
-      const options = content.split('|');
-      return randomChoice(options);
+      const options = content.split('|').map(s => s.trim()).filter(s => s.length > 0);
+      if (options.length === 0) return match;
+      return randomChoice(options, seed ? seed + iterations : null);
     });
+    iterations++;
   }
   
   return result;
 }
 
-// -------- Helper: derive host pieces ----------
+// -------- SELECT EMAIL CLIENT ----------
+function selectEmailClient(fromAddress) {
+  const weights = {};
+  for (const [key, profile] of Object.entries(CLIENT_PROFILES)) {
+    weights[key] = profile.weight;
+  }
+  
+  // Adjust for Japanese domains
+  if (fromAddress) {
+    const domain = fromAddress.toLowerCase();
+    if (domain.includes('.jp') || domain.includes('co.jp') || domain.includes('ne.jp')) {
+      weights.becky = (weights.becky || 0.05) * 4;
+      weights.thunderbird = (weights.thunderbird || 0.25) * 1.5;
+      weights.outlook = (weights.outlook || 0.30) * 1.3;
+    }
+    
+    if (domain.includes('gmail')) {
+      weights.gmail = 0.5;
+    } else if (domain.includes('outlook') || domain.includes('hotmail')) {
+      weights.outlook = 0.6;
+    } else if (domain.includes('icloud') || domain.includes('me.com')) {
+      weights.appleMail = 0.6;
+    }
+  }
+  
+  return weightedRandom(weights);
+}
+
+// -------- GENERATE CLIENT FINGERPRINT ----------
+function generateClientFingerprint(clientType, domain, seed) {
+  const profile = CLIENT_PROFILES[clientType];
+  if (!profile) return generateClientFingerprint('thunderbird', domain, seed);
+  
+  const versionRange = randomChoice(profile.versions, seed);
+  const template = randomChoice(profile.templates, seed + 1);
+  
+  // Generate version numbers
+  const v1 = randomInt(versionRange[0], versionRange[1], seed);
+  const v2 = randomInt(0, 20, seed + 1);
+  const v3 = randomInt(0, 9, seed + 2);
+  
+  // Process spintax in template
+  let userAgent = template ? processSpintax(template, seed + 3) : null;
+  
+  // Replace version placeholders
+  if (userAgent) {
+    userAgent = userAgent
+      .replace(/{v1}/g, v1)
+      .replace(/{v2}/g, v2)
+      .replace(/{v3}/g, v3);
+  }
+  
+  // Generate random tokens for Message-ID and boundary
+  const r = [
+    crypto.randomBytes(8).toString('hex'),
+    crypto.randomBytes(6).toString('hex'),
+    crypto.randomBytes(4).toString('hex'),
+    randomInt(10000, 99999),
+    crypto.randomBytes(12).toString('base64url'),
+    randomInt(1000, 9999)
+  ];
+  
+  const timestamp = Date.now();
+  const messageIdFormat = randomChoice(MESSAGE_ID_FORMATS, seed + 4);
+  const messageId = messageIdFormat(domain || 'localhost', timestamp, r);
+  
+  const boundaryFormat = randomChoice(BOUNDARY_FORMATS, seed + 5);
+  const boundary = boundaryFormat(r);
+  
+  return {
+    clientType,
+    userAgent,
+    messageId,
+    boundary,
+    headerOrder: [...profile.headerOrder],
+    headerType: profile.headerType,
+    version: `${v1}.${v2}.${v3}`
+  };
+}
+
+// -------- GENERATE CAMPAIGN ID ----------
+function generateCampaignId(domain, date = new Date()) {
+  const year = date.getFullYear().toString().slice(-2);
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const random = crypto.randomBytes(2).toString('hex');
+  
+  const formats = [
+    `nl${year}${month}${day}`,
+    `news${month}${day}`,
+    `mag${year}${month}`,
+    `info${day}${month}`,
+    `update${month}${year}`,
+    `${year}${month}${day}`,
+    `c${randomInt(1000, 9999)}`,
+    `campaign${month}${day}`,
+    `mail${year}${month}`,
+    `${random}${month}`,
+    `n${year}${month}`,
+    `id${day}${random}`,
+    `msg${year}${day}`,
+    `e${month}${year}`,
+    `camp${random}`
+  ];
+  
+  return randomChoice(formats);
+}
+
+// -------- DOMAIN HELPER ----------
 function deriveUnsubHost(fromAddress) {
   if (!fromAddress || !fromAddress.includes('@')) {
     return { host: null, subLabel: 'mail', rootDomain: null, domainFull: null };
   }
+  
   const domainFull = fromAddress.split('@')[1].toLowerCase();
   const parts = domainFull.split('.').filter(Boolean);
 
@@ -276,215 +441,181 @@ function deriveUnsubHost(fromAddress) {
   }
 
   const rootDomain = parts.slice(-2).join('.');
-  const subLabel = parts.length > 2 ? parts[0] : 'mail';
+  const naturalSubs = ['mail', 'email', 'info', 'news', 'newsletter', 'noreply', 'update', 'no-reply', 'notifications', 'alerts'];
+  const subLabel = parts.length > 2 ? parts[0] : randomChoice(naturalSubs);
   const host = `${subLabel}.${rootDomain}`;
 
   return { host, subLabel, rootDomain, domainFull };
 }
 
-// -------- Helper: generate unsubscribe token ----------
-function generateUnsubToken(email, campaign, secret) {
-  const hourBucket = Math.floor(Date.now() / (1000 * 60 * 60));
+// -------- GENERATE UNSUBSCRIBE TOKEN ----------
+function generateUnsubToken(email, campaign, secret, timestamp = null) {
+  const ts = timestamp || Date.now();
+  const hourBucket = Math.floor(ts / (1000 * 60 * 60));
   const payload = `${email}|${campaign}|${hourBucket}`;
+  
   const sig = crypto.createHmac('sha256', secret)
     .update(payload)
     .digest('base64url')
     .slice(0, 32);
+  
   const raw = `${payload}|${sig}`;
   return Buffer.from(raw).toString('base64url');
 }
 
-// -------- Helper: Generate Random Campaign ID ----------
-function generateRandomCampaignId() {
-  const prefixes = ['news', 'update', 'alert', 'promo', 'info', 'campaign', 'msg', 'mail', 
-                    'blast', 'send', 'dist', 'letter', 'digest', 'weekly', 'monthly', 
-                    'daily', 'special', 'offer', 'notice', 'bulletin', 'flash', 'brief'];
-  const suffixes = ['_id', '_ref', '_code', '_tag', '_key', '', '', ''];
+// -------- ORDER HEADERS ----------
+function orderHeaders(headers, baseOrder, injectNatural = true) {
+  const ordered = [];
+  const remaining = new Map(headers);
   
-  const prefix = randomChoice(prefixes);
-  const suffix = randomChoice(suffixes);
-  const randomNum = randomInt(1000, 9999999);
-  const randomStr = crypto.randomBytes(randomInt(2, 5)).toString('hex');
+  for (const headerName of baseOrder) {
+    for (const [name, value] of remaining) {
+      if (name.toLowerCase() === headerName.toLowerCase()) {
+        ordered.push({ name, value });
+        remaining.delete(name);
+        break;
+      }
+    }
+  }
   
-  const formats = [
-    `${prefix}_${randomNum}${suffix}`,
-    `${prefix}-${randomStr}${suffix}`,
-    `${randomNum}_${prefix}${suffix}`,
-    `${randomStr}${randomNum}${suffix}`,
-    `${prefix}${randomNum}${suffix}`,
-    `${randomStr}_${prefix}${suffix}`,
-    `${prefix}${suffix}${randomNum}`,
-    `c${randomNum}${prefix}${suffix}`,
-    `${randomStr}${suffix}`
-  ];
+  if (remaining.size > 0) {
+    const remainingArray = Array.from(remaining).map(([name, value]) => ({ name, value }));
+    
+    if (injectNatural) {
+      for (const header of remainingArray) {
+        const insertPos = randomInt(Math.floor(ordered.length * 0.4), ordered.length);
+        ordered.splice(insertPos, 0, header);
+      }
+    } else {
+      ordered.push(...remainingArray);
+    }
+  }
   
-  return randomChoice(formats);
+  return ordered;
 }
 
-// -------- Helper: build per-message CONFIG ----------
+// -------- BUILD CONFIG ----------
 function buildConfig(fromAddress) {
-  const { host, rootDomain } = deriveUnsubHost(fromAddress || '');
-
+  const { host, rootDomain, domainFull } = deriveUnsubHost(fromAddress || '');
+  const seed = getTimeBasedSeed();
+  const clientType = selectEmailClient(fromAddress);
+  const fingerprint = generateClientFingerprint(clientType, host, seed);
+  
   return {
-    enableMicrodata: true,
-    enableImageOptimization: true,
-    enablePlainTextTuning: true,
-    enableSpintax: true,
-
     // Unsubscribe
     enableListHeaders: true,
-    enableUnsubPlaceholders: true,
     unsubscribeHost: host,
-    unsubscribeBaseURL: host ? `https://${host}/unsubcribe` : null,
+    unsubscribeBaseURL: host ? `https://${host}/unsubscribe` : null,
     unsubscribeMailtoLocal: 'unsubscribe',
     unsubscribeMethod: 'One-Click',
-    unsubscribeSecret: process.env.UNSUB_SECRET || 'EHEHRBAJSNDA123123',
+    unsubscribeSecret: process.env.UNSUB_SECRET || 'CHANGE_THIS_SECRET_KEY',
 
-    // Campaign identifiers (randomized)
-    defaultCampaignId: generateRandomCampaignId(),
-    enableFeedbackID: true,
+    // Campaign
+    campaignId: generateCampaignId(rootDomain),
     rootDomain,
 
-    // Randomization
-    randomizeHeaders: true,
-    randomizeHeaderOrder: true, // NEW: Enable header order randomization
-    randomMailer: generateRandomMailer(),
-    randomMessageId: host ? generateMessageId(host) : generateMessageId('localhost'),
-    randomBoundary: generateBoundary(),
+    // Client fingerprint
+    clientType,
+    userAgent: fingerprint.userAgent,
+    messageId: fingerprint.messageId,
+    boundary: fingerprint.boundary,
+    headerOrder: fingerprint.headerOrder,
+    headerType: fingerprint.headerType,
     
-    // Extra headers
-    addBodyHashHeaders: false,
-    setAutoSubmitted: false,
-    addPrecedence: Math.random() > 0.5,
+    // Optional header flags
+    addPrecedence: Math.random() > 0.6,
     precedenceValue: randomChoice(['bulk', 'list']),
+    addFeedbackID: Math.random() > 0.5,
+    addAutoSubmitted: Math.random() > 0.85,
+    addXPriority: Math.random() > 0.7,
     
-    // Timing randomization
-    addRandomDelay: 0, // Set to > 0 to add delays in seconds
+    // Anti-detection
+    naturalHeaderOrder: true,
+    
+    seed
   };
 }
 
-// -------- Helper: replace placeholders in a body part ----------
-function replacePlaceholders(content, rcptEmail, unsubData, config) {
-  if (!content) return content;
+// -------- ADD HEADERS ----------
+function addHeaders(txn, config, unsubData) {
+  // Remove old headers
+  const headersToRemove = [
+    'List-Unsubscribe', 'List-Unsubscribe-Post', 'Feedback-ID',
+    'X-Mailer', 'User-Agent', 'Auto-Submitted', 'Message-ID',
+    'Precedence', 'X-Priority', 'X-Campaign', 'X-Campaign-ID'
+  ];
+  
+  headersToRemove.forEach(h => {
+    while (txn.header.get_all(h).length) {
+      txn.remove_header(h);
+    }
+  });
 
-  // Process spintax first
-  if (config.enableSpintax) {
-    content = processSpintax(content);
+  const headers = new Map();
+
+  // Essential headers
+  headers.set('Message-ID', config.messageId);
+  
+  if (!txn.header.get('MIME-Version')) {
+    headers.set('MIME-Version', '1.0');
   }
 
-  // Recipient placeholders
-  if (rcptEmail) {
-    const [local, domain] = rcptEmail.split('@');
-    content = content
-      .replace(/{{RECIPIENT_EMAIL}}/g, rcptEmail)
-      .replace(/{{RECIPIENT_USERNAME}}/g, local || '')
-      .replace(/{{RECIPIENT_DOMAIN}}/g, domain || '');
+  // User-Agent or X-Mailer
+  if (config.userAgent) {
+    headers.set(config.headerType, config.userAgent);
   }
 
-  if (config.enableUnsubPlaceholders && unsubData) {
-    content = content
-      .replace(/{{UNSUB_URL}}/g, unsubData.url)
-      .replace(/{{UNSUB_MAILTO}}/g, unsubData.mailto);
-  }
-
-  // Add timestamp placeholders
-  const now = new Date();
-  content = content
-    .replace(/{{YEAR}}/g, now.getFullYear())
-    .replace(/{{MONTH}}/g, now.getMonth() + 1)
-    .replace(/{{DAY}}/g, now.getDate())
-    .replace(/{{TIMESTAMP}}/g, now.getTime());
-
-  return content;
-}
-
-// -------- Helper: HTML processing ----------
-function processHtml(html, rcptEmail, unsubData, config) {
-  if (!html) return html;
-
-  // DOCTYPE
-  if (!/<!doctype/i.test(html)) {
-    const doctypes = [
-      '<!DOCTYPE html>',
-      '<!DOCTYPE HTML>',
-      '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">',
-      '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">',
-      '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">',
-      '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">'
+  // List-Unsubscribe
+  if (unsubData) {
+    const unsubFormats = [
+      `<${unsubData.url}>`,
+      `<${unsubData.mailto}>, <${unsubData.url}>`,
+      `<${unsubData.url}>, <${unsubData.mailto}>`
     ];
-    html = randomChoice(doctypes) + '\n' + html;
+    headers.set('List-Unsubscribe', randomChoice(unsubFormats));
+    headers.set('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
   }
-  
-  // Head/meta
-  if (!/<head\b/i.test(html)) {
-    html = html.replace(/<html[^>]*>/i, '$&\n<head></head>');
-  }
-  if (!/<meta[^>]+charset/i.test(html)) {
-    const charsetFormats = [
-      '<meta charset="UTF-8">',
-      '<meta charset="utf-8">',
-      '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">',
-      '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">',
-      '<meta http-equiv="content-type" content="text/html; charset=UTF-8">'
+
+  // Feedback-ID (random format)
+  if (config.addFeedbackID && config.rootDomain) {
+    const r = [
+      crypto.randomBytes(3).toString('hex'),
+      crypto.randomBytes(2).toString('hex'),
+      randomInt(1000, 99999)
     ];
-    html = html.replace(/<head[^>]*>/i, m => m + '\n' + randomChoice(charsetFormats));
+    const feedbackFormat = randomChoice(FEEDBACK_ID_FORMATS);
+    const feedbackId = feedbackFormat(config.campaignId, r, config.rootDomain);
+    headers.set('Feedback-ID', feedbackId);
   }
 
-  // Optional microdata
-  if (config.enableMicrodata && !/itemscope/i.test(html) && Math.random() > 0.3) {
-    html = html.replace(/<body[^>]*>/i, m => m + '\n<div itemscope itemtype="http://schema.org/EmailMessage">');
-    html = html.replace(/<\/body>/i, '</div>\n</body>');
+  // Optional headers
+  if (config.addPrecedence) {
+    headers.set('Precedence', config.precedenceValue);
   }
 
-  // Image normalization with randomization
-  if (config.enableImageOptimization) {
-    html = html.replace(/<img\b([^>]*)>/gi, (m, attrs) => {
-      let a = attrs;
-      if (!/border=/i.test(a)) a += ' border="0"';
-      
-      const styles = [
-        'display:block;max-width:100%;height:auto;',
-        'display:block;width:100%;height:auto;',
-        'max-width:100%;height:auto;display:block;',
-        'display:inline-block;max-width:100%;height:auto;',
-        'display: block; max-width: 100%; height: auto;',
-        'max-width:100%;height:auto;',
-        'width:100%;height:auto;display:block;'
-      ];
-      
-      if (!/style=/i.test(a)) {
-        a += ` style="${randomChoice(styles)}"`;
-      }
-      
-      if (!/loading=/i.test(a) && Math.random() > 0.4) {
-        a += ' loading="lazy"';
-      }
-      
-      return `<img${a}>`;
-    });
+  if (config.addAutoSubmitted) {
+    headers.set('Auto-Submitted', 'auto-generated');
   }
 
-  html = replacePlaceholders(html, rcptEmail, unsubData, config);
-  return html;
+  if (config.addXPriority) {
+    const priorities = ['3', '3 (Normal)', '5', '5 (Lowest)', '4', '4 (Low)', '2', '2 (High)'];
+    headers.set('X-Priority', randomChoice(priorities));
+  }
+
+  // Order headers naturally
+  const orderedHeaders = orderHeaders(headers, config.headerOrder, config.naturalHeaderOrder);
+
+  // Apply headers
+  for (const { name, value } of orderedHeaders) {
+    txn.add_header(name, value);
+  }
 }
 
-function processPlain(text, rcptEmail, unsubData, config) {
-  if (!text) return text;
-  text = replacePlaceholders(text, rcptEmail, unsubData, config);
-  
-  if (config.enablePlainTextTuning) {
-    text = text.replace(/([.!?]) +([A-Z])/g, '$1\n\n$2');
-  }
-  
-  return text;
-}
-
-// -------- Plugin registration ----------
+// -------- PLUGIN HOOKS ----------
 exports.register = function () {
-  this.loginfo('optimize plugin loaded with massive randomization (1000+ X-Mailer combinations + randomized header order)');
+  this.loginfo('optimize plugin loaded with 10,000+ header variations');
 };
 
-// -------- Core hook (post data) ----------
 exports.hook_data_post = function (next, connection) {
   const plugin = this;
   const txn = connection.transaction;
@@ -494,160 +625,39 @@ exports.hook_data_post = function (next, connection) {
     const fromAddr = txn.mail_from && txn.mail_from.address && txn.mail_from.address();
     const config = buildConfig(fromAddr);
 
-    if (config.addRandomDelay > 0) {
-      setTimeout(() => continueProcessing(), config.addRandomDelay * 1000);
-      return;
-    }
-
-    continueProcessing();
-
-    function continueProcessing() {
+    // Generate unsubscribe data
+    let unsubData = null;
+    if (config.unsubscribeBaseURL) {
       const rcptObj = txn.rcpt_to && txn.rcpt_to[0];
       const rcptEmail = rcptObj && rcptObj.address && rcptObj.address();
-
-      let unsubData = null;
-      if (config.enableListHeaders && config.unsubscribeBaseURL && rcptEmail) {
-        const token = generateUnsubToken(rcptEmail, config.defaultCampaignId, config.unsubscribeSecret);
-        const url = `${config.unsubscribeBaseURL.replace(/\/$/, '')}/${encodeURIComponent(token)}`;
-        const mailto = `mailto:${config.unsubscribeMailtoLocal}@${config.unsubscribeHost}?subject=unsubscribe&body=${encodeURIComponent(rcptEmail)}`;
+      
+      if (rcptEmail) {
+        const token = generateUnsubToken(rcptEmail, config.campaignId, config.unsubscribeSecret);
+        const url = `${config.unsubscribeBaseURL}/${encodeURIComponent(token)}`;
+        const mailto = `mailto:${config.unsubscribeMailtoLocal}@${config.unsubscribeHost}?subject=unsubscribe`;
         unsubData = { token, url, mailto };
       }
-
-      if (txn.body) {
-        if (txn.body.children && txn.body.children.length) {
-          for (const part of txn.body.children) {
-            const ct = (part.ct || '').toLowerCase();
-            if (ct.includes('text/html')) {
-              const raw = part.bodytext.toString();
-              const out = processHtml(raw, rcptEmail, unsubData, config);
-              part.bodytext = Buffer.from(out);
-            } else if (ct.includes('text/plain')) {
-              const raw = part.bodytext.toString();
-              const out = processPlain(raw, rcptEmail, unsubData, config);
-              part.bodytext = Buffer.from(out);
-            }
-          }
-        } else if (txn.body.bodytext) {
-          const raw = txn.body.bodytext.toString();
-          if (/<html/i.test(raw)) {
-            const out = processHtml(raw, rcptEmail, unsubData, config);
-            txn.body.bodytext = Buffer.from(out);
-          } else {
-            const out = processPlain(raw, rcptEmail, unsubData, config);
-            txn.body.bodytext = Buffer.from(out);
-          }
-        }
-      }
-
-      addHeaders(txn, config, unsubData);
-
-      connection.loginfo(plugin, `optimize: ${config.randomMailer} | campaign: ${config.defaultCampaignId}`);
-      next();
     }
+
+    // Add headers
+    addHeaders(txn, config, unsubData);
+
+    connection.loginfo(plugin, `headers: client=${config.clientType}, msgid=${config.messageId.slice(0, 20)}..., campaign=${config.campaignId}`);
+    next();
   } catch (err) {
     connection.logerror(plugin, `optimize error: ${err.message}`);
     next();
   }
 };
 
-// -------- Add headers with massive randomization + RANDOMIZED ORDER ----------
-function addHeaders(txn, config, unsubData) {
-  // Remove old headers first
-  ['List-Unsubscribe','List-Unsubscribe-Post','Feedback-ID','X-Mailer','Auto-Submitted','Message-ID','Precedence','X-Priority','X-Campaign-ID','X-Campaign','X-CampaignID','X-Mail-Campaign','X-MailCampaign'].forEach(h => {
-    while (txn.header.get_all(h).length) txn.remove_header(h);
-  });
-
-  // Build headers as an array of objects
-  const headersToAdd = [];
-
-  // Random Message-ID (critical for uniqueness) - ALWAYS ADD
-  if (config.randomMessageId) {
-    headersToAdd.push({ name: 'Message-ID', value: config.randomMessageId });
-  }
-
-  // Random X-Mailer - ALWAYS ADD
-  if (config.randomizeHeaders && config.randomMailer) {
-    headersToAdd.push({ name: 'X-Mailer', value: config.randomMailer });
-  }
-
-  // MIME-Version - ALWAYS ADD (but can be randomized in position)
-  if (!txn.header.get('MIME-Version')) {
-    headersToAdd.push({ name: 'MIME-Version', value: '1.0' });
-  }
-
-  // List-Unsubscribe with randomization
-  if (config.enableListHeaders && unsubData) {
-    if (Math.random() > 0.5) {
-      headersToAdd.push({ name: 'List-Unsubscribe', value: `<${unsubData.mailto}>, <${unsubData.url}>` });
-    } else {
-      headersToAdd.push({ name: 'List-Unsubscribe', value: `<${unsubData.url}>, <${unsubData.mailto}>` });
-    }
-    headersToAdd.push({ name: 'List-Unsubscribe-Post', value: `List-Unsubscribe=${config.unsubscribeMethod}` });
-  }
-
-  // Randomized Feedback-ID
-  if (config.enableFeedbackID && config.rootDomain) {
-    const random1 = crypto.randomBytes(randomInt(3, 6)).toString('hex');
-    const random2 = crypto.randomBytes(randomInt(2, 4)).toString('hex');
-    const random3 = randomInt(1000, 999999);
-    
-    const formats = [
-      `${config.defaultCampaignId}:${random1}:newsletter:${config.rootDomain}`,
-      `${random1}:${config.defaultCampaignId}:mail:${config.rootDomain}`,
-      `${config.defaultCampaignId}:default:${random2}:${config.rootDomain}`,
-      `campaign:${config.defaultCampaignId}:${random1}:${config.rootDomain}`,
-      `${random3}:${config.defaultCampaignId}:news:${config.rootDomain}`,
-      `${config.defaultCampaignId}:${random2}:${random1}:${config.rootDomain}`,
-      `${random1}:${random3}:campaign:${config.rootDomain}`,
-      `${config.defaultCampaignId}:m:${random1}:${config.rootDomain}`,
-      `fb:${config.defaultCampaignId}:${random2}:${config.rootDomain}`,
-      `${random2}:${config.defaultCampaignId}:${random1}:${config.rootDomain}`
-    ];
-    
-    headersToAdd.push({ name: 'Feedback-ID', value: randomChoice(formats) });
-  }
-
-  // Random Precedence header
-  if (config.addPrecedence) {
-    headersToAdd.push({ name: 'Precedence', value: config.precedenceValue });
-  }
-
-  // Randomly add X-Priority
-  if (Math.random() > 0.7) {
-    const priorities = ['3', '3 (Normal)', '5', '5 (Lowest)', '4', '4 (Low)'];
-    headersToAdd.push({ name: 'X-Priority', value: randomChoice(priorities) });
-  }
-
-  // Auto-Submitted (sometimes)
-  if (config.setAutoSubmitted || Math.random() > 0.8) {
-    headersToAdd.push({ name: 'Auto-Submitted', value: 'auto-generated' });
-  }
-
-  // Random X-Campaign header variations
-  const campaignHeaders = ['X-Campaign-ID', 'X-Campaign', 'X-CampaignID', 'X-Mail-Campaign', 'X-MailCampaign'];
-  if (Math.random() > 0.5) {
-    headersToAdd.push({ name: randomChoice(campaignHeaders), value: config.defaultCampaignId });
-  }
-
-  // **RANDOMIZE THE ORDER OF HEADERS**
-  const shuffledHeaders = config.randomizeHeaderOrder ? shuffleArray(headersToAdd) : headersToAdd;
-
-  // Add all headers in the randomized order
-  for (const header of shuffledHeaders) {
-    txn.add_header(header.name, header.value);
-  }
-}
-
-// -------- Exports for tests ----------
+// -------- EXPORTS ----------
 exports._internal = {
   deriveUnsubHost,
   generateUnsubToken,
   buildConfig,
-  processHtml,
-  processPlain,
+  selectEmailClient,
+  generateClientFingerprint,
   processSpintax,
-  generateRandomMailer,
-  generateMessageId,
-  generateBoundary,
-  shuffleArray
+  orderHeaders,
+  generateCampaignId
 };
