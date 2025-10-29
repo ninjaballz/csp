@@ -3,15 +3,23 @@
 const crypto = require('crypto');
 
 /*
-  Amazon SES-Style Email Header Generator
-  ----------------------------------------
-  Generates realistic Amazon SES headers with random values
+  Amazon SES-Style Email Header Generator with Spam Compliance
+  -------------------------------------------------------------
+  Generates realistic Amazon SES headers with random values + spam compliance headers
   - X-AMAZON-MAIL-RELAY-TYPE
   - Bounces-to
   - X-AMAZON-METADATA
   - X-Original-MessageID
   - Feedback-ID
   - X-SES-Outgoing (with current date + random Amazon IP)
+  
+  Spam Compliance:
+  - List-Unsubscribe (URL + mailto)
+  - List-Unsubscribe-Post
+  - Precedence
+  - X-Mailer / User-Agent (100+ combinations)
+  - X-Priority
+  - Auto-Submitted
 */
 
 // Real Amazon IP CIDR blocks
@@ -81,6 +89,159 @@ const AMAZON_IP_RANGES = [
   "52.95.255.64/28", "52.144.199.128/26", "52.144.225.64/26", "52.219.143.0/24", "54.240.236.22/32",
   "104.255.59.201/32", "150.222.51.160/27", "151.148.40.0/24", "159.248.224.0/21", "204.246.168.0/22",
   "3.4.12.1/32"
+];
+
+// X-Mailer / User-Agent - 100+ combinations
+const MAILER_AGENTS = [
+  // Amazon services
+  'Amazon SES',
+  'Amazon Simple Email Service',
+  'AmazonSES',
+  'Amazon WorkMail',
+  'Amazon Pinpoint',
+  
+  // AWS SDKs
+  'aws-sdk-nodejs',
+  'aws-sdk-php',
+  'aws-sdk-python',
+  'aws-sdk-ruby',
+  'aws-sdk-java',
+  'aws-sdk-go',
+  'AWS SDK for JavaScript',
+  'AWS SDK for Python/Boto3',
+  'AWS SDK for .NET',
+  
+  // Thunderbird variations
+  'Mozilla Thunderbird',
+  'Thunderbird',
+  'Mozilla/5.0 Thunderbird/91.0',
+  'Mozilla/5.0 Thunderbird/102.0',
+  'Mozilla/5.0 Thunderbird/115.0',
+  'Thunderbird/91.13.0',
+  'Thunderbird/102.15.1',
+  
+  // Outlook variations
+  'Microsoft Outlook',
+  'Microsoft Office Outlook',
+  'Outlook',
+  'Microsoft Outlook 16.0',
+  'Microsoft Outlook 15.0',
+  'Outlook-Desktop/16.0',
+  'Outlook Express',
+  
+  // Apple Mail
+  'Apple Mail',
+  'Mail/16.0',
+  'Apple Mail (2.3569.0.0)',
+  'Darwin Mail',
+  'iOS Mail',
+  
+  // Gmail & Google
+  'Gmail',
+  'Google Mail',
+  'Gmail API',
+  'Google Workspace',
+  
+  // Yahoo
+  'Yahoo! Mail',
+  'Yahoo Mail',
+  'YahooMailClassic',
+  'YahooMailApp',
+  
+  // ProtonMail
+  'ProtonMail',
+  'Proton Mail',
+  'ProtonMail Bridge',
+  
+  // Other popular clients
+  'Mailbird',
+  'eM Client',
+  'The Bat!',
+  'Postbox',
+  'Vivaldi Mail',
+  'Evolution',
+  'Claws Mail',
+  'Sylpheed',
+  'KMail',
+  'Mutt',
+  'Alpine',
+  'Pine',
+  'MailMate',
+  'Spark',
+  'Airmail',
+  'Newton Mail',
+  'Canary Mail',
+  'Superhuman',
+  'Hey',
+  'Fastmail',
+  
+  // Mobile clients
+  'K-9 Mail',
+  'BlueMail',
+  'TypeApp',
+  'FairEmail',
+  'Edison Mail',
+  'Spike',
+  'myMail',
+  
+  // Webmail
+  'Roundcube',
+  'SquirrelMail',
+  'Horde',
+  'RainLoop',
+  'Zimbra',
+  'SOGo',
+  
+  // Enterprise/Corporate
+  'IBM Notes',
+  'Lotus Notes',
+  'Novell GroupWise',
+  'Exchange Server',
+  'Microsoft Exchange',
+  
+  // Marketing platforms
+  'Mailchimp',
+  'SendGrid',
+  'Mailgun',
+  'SparkPost',
+  'Postmark',
+  'Sendinblue',
+  'Campaign Monitor',
+  'Constant Contact',
+  'AWeber',
+  'GetResponse',
+  'ConvertKit',
+  'ActiveCampaign',
+  'Drip',
+  'HubSpot',
+  'Marketo',
+  'Salesforce Marketing Cloud',
+  
+  // Programming languages/frameworks
+  'PHPMailer',
+  'SwiftMailer',
+  'Nodemailer',
+  'ActionMailer',
+  'Django Mail',
+  'Laravel Mail',
+  'Spring Mail',
+  'JavaMail',
+  '.NET Mail',
+  'Python smtplib',
+  
+  // CMS/Platforms
+  'WordPress',
+  'Drupal',
+  'Joomla',
+  'Magento',
+  'PrestaShop',
+  'WooCommerce',
+  'Shopify',
+  
+  // Sometimes no header
+  null,
+  null,
+  null
 ];
 
 // -------- HELPERS ----------
@@ -206,6 +367,16 @@ function generateFeedbackID() {
   return `${num1}::1.${region}.${hash}:AmazonSES`;
 }
 
+function generateUnsubToken(email, secret) {
+  const ts = Date.now();
+  const payload = `${email}|${ts}`;
+  const sig = crypto.createHmac('sha256', secret)
+    .update(payload)
+    .digest('base64url')
+    .slice(0, 32);
+  return Buffer.from(`${payload}|${sig}`).toString('base64url');
+}
+
 function deriveUnsubHost(fromAddress) {
   if (!fromAddress || !fromAddress.includes('@')) {
     return 'example.com';
@@ -213,16 +384,27 @@ function deriveUnsubHost(fromAddress) {
   return fromAddress.split('@')[1].toLowerCase();
 }
 
-function buildConfig(fromAddress) {
+function buildConfig(fromAddress, toAddress) {
   const domain = deriveUnsubHost(fromAddress);
+  const unsubSecret = process.env.UNSUB_SECRET || 'CHANGE_THIS_SECRET_KEY';
   
   return {
+    // Amazon SES headers
     relayType: 'notification',
     bouncesTo: generateBouncesTo(domain),
     metadata: generateMetadata(),
     messageID: generateMessageID(),
     feedbackID: generateFeedbackID(),
-    sesOutgoing: `${getCurrentDateFormatted()}-${generateAmazonIP()}`
+    sesOutgoing: `${getCurrentDateFormatted()}-${generateAmazonIP()}`,
+    
+    // Spam compliance
+    domain: domain,
+    toAddress: toAddress,
+    unsubToken: toAddress ? generateUnsubToken(toAddress, unsubSecret) : null,
+    xMailer: MAILER_AGENTS[randomInt(0, MAILER_AGENTS.length - 1)],
+    addPrecedence: Math.random() > 0.3, // 70% chance
+    addPriority: Math.random() > 0.6,   // 40% chance
+    addAutoSubmitted: Math.random() > 0.7 // 30% chance
   };
 }
 
@@ -234,7 +416,13 @@ function addHeaders(txn, config) {
     'X-AMAZON-METADATA',
     'X-Original-MessageID',
     'Feedback-ID',
-    'X-SES-Outgoing'
+    'X-SES-Outgoing',
+    'List-Unsubscribe',
+    'List-Unsubscribe-Post',
+    'Precedence',
+    'X-Mailer',
+    'X-Priority',
+    'Auto-Submitted'
   ];
   
   headersToRemove.forEach(h => {
@@ -243,17 +431,60 @@ function addHeaders(txn, config) {
     }
   });
   
-  // Add headers in order
+  // Add Amazon SES headers
   txn.add_header('X-AMAZON-MAIL-RELAY-TYPE', config.relayType);
   txn.add_header('Bounces-to', config.bouncesTo);
   txn.add_header('X-AMAZON-METADATA', config.metadata);
   txn.add_header('X-Original-MessageID', config.messageID);
   txn.add_header('Feedback-ID', config.feedbackID);
   txn.add_header('X-SES-Outgoing', config.sesOutgoing);
+  
+  // Add spam compliance headers
+  
+  // List-Unsubscribe (RFC 2369)
+  if (config.unsubToken && config.domain) {
+    const unsubUrl = `https://${config.domain}/unsubscribe/${config.unsubToken}`;
+    const unsubMailto = `mailto:unsubscribe@${config.domain}?subject=unsubscribe`;
+    
+    // Random format: URL only, mailto only, or both
+    const format = randomInt(1, 3);
+    if (format === 1) {
+      txn.add_header('List-Unsubscribe', `<${unsubUrl}>`);
+    } else if (format === 2) {
+      txn.add_header('List-Unsubscribe', `<${unsubMailto}>`);
+    } else {
+      txn.add_header('List-Unsubscribe', `<${unsubUrl}>, <${unsubMailto}>`);
+    }
+    
+    // List-Unsubscribe-Post (RFC 8058 - One-Click)
+    txn.add_header('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+  }
+  
+  // Precedence (bulk mail indicator)
+  if (config.addPrecedence) {
+    const precedence = ['bulk', 'list'][randomInt(0, 1)];
+    txn.add_header('Precedence', precedence);
+  }
+  
+  // X-Mailer
+  if (config.xMailer) {
+    txn.add_header('X-Mailer', config.xMailer);
+  }
+  
+  // X-Priority (3 = Normal, 5 = Lowest for bulk)
+  if (config.addPriority) {
+    const priorities = ['3', '3 (Normal)', '5', '5 (Lowest)'];
+    txn.add_header('X-Priority', priorities[randomInt(0, priorities.length - 1)]);
+  }
+  
+  // Auto-Submitted (RFC 3834)
+  if (config.addAutoSubmitted) {
+    txn.add_header('Auto-Submitted', 'auto-generated');
+  }
 }
 
 exports.register = function() {
-  this.loginfo('Amazon SES-style header plugin loaded with real CIDR blocks');
+  this.loginfo('Amazon SES-style header plugin with spam compliance loaded (100+ X-Mailer combinations)');
 };
 
 exports.hook_data_post = function(next, connection) {
@@ -263,11 +494,13 @@ exports.hook_data_post = function(next, connection) {
   
   try {
     const fromAddr = txn.mail_from && txn.mail_from.address && txn.mail_from.address();
+    const rcptObj = txn.rcpt_to && txn.rcpt_to[0];
+    const toAddr = rcptObj && rcptObj.address && rcptObj.address();
     
-    const config = buildConfig(fromAddr);
+    const config = buildConfig(fromAddr, toAddr);
     addHeaders(txn, config);
     
-    connection.loginfo(plugin, `ses-headers: relay=${config.relayType}, outgoing=${config.sesOutgoing}`);
+    connection.loginfo(plugin, `ses-headers: relay=${config.relayType}, outgoing=${config.sesOutgoing}, mailer=${config.xMailer || 'none'}`);
     next();
   } catch (err) {
     connection.logerror(plugin, `error: ${err.message}`);
@@ -285,5 +518,6 @@ exports._internal = {
   generateAmazonIP,
   getCurrentDateFormatted,
   parseCIDR,
-  intToIP
+  intToIP,
+  generateUnsubToken
 };
