@@ -401,35 +401,12 @@ function buildConfig(fromAddress, toAddress) {
     domain: domain,
     toAddress: toAddress,
     unsubToken: toAddress ? generateUnsubToken(toAddress, unsubSecret) : null,
-    xMailer: MAILER_AGENTS[randomInt(0, MAILER_AGENTS.length - 1)],
     addPrecedence: Math.random() > 0.3, // 70% chance
     addPriority: Math.random() > 0.6,   // 40% chance
     addAutoSubmitted: Math.random() > 0.7 // 30% chance
   };
 }
 
-function addHeaders(txn, config) {
-  // Remove existing headers if present
-  const headersToRemove = [
-    'X-AMAZON-MAIL-RELAY-TYPE',
-    'Bounces-to',
-    'X-AMAZON-METADATA',
-    'X-Original-MessageID',
-    'Feedback-ID',
-    'X-SES-Outgoing',
-    'List-Unsubscribe',
-    'List-Unsubscribe-Post',
-    'Precedence',
-    'X-Mailer',
-    'X-Priority',
-    'Auto-Submitted'
-  ];
-  
-  headersToRemove.forEach(h => {
-    while (txn.header.get_all(h).length) {
-      txn.remove_header(h);
-    }
-  });
   
   // Add Amazon SES headers
   txn.add_header('X-AMAZON-MAIL-RELAY-TYPE', config.relayType);
