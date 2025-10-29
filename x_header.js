@@ -466,10 +466,6 @@ function addHeaders(txn, config) {
     txn.add_header('Precedence', precedence);
   }
   
-  // X-Mailer
-  if (config.xMailer) {
-    txn.add_header('X-Mailer', config.xMailer);
-  }
   
   // X-Priority (3 = Normal, 5 = Lowest for bulk)
   if (config.addPriority) {
