@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-11-22T11:57:27.379234",
+  "timestamp": "2025-11-22T12:09:29.236930",
   "countries": [
     "JP",
     "KR",
@@ -11,7 +11,7 @@
     "BR"
   ],
   "total_cidrs_requested": 50,
-  "total_cidrs_found": 47,
+  "total_cidrs_found": 39,
   "distribution": {
     "cidrs_per_country": 6,
     "remaining_cidrs": 2
@@ -21,45 +21,27 @@
       "target_cidrs": 7,
       "clean_cidrs_found": 7,
       "saved_cidrs": [
-        "202.126.16.0/22",
-        "202.126.16.0/23",
-        "218.100.15.0/24",
+        "202.10.96.0/20",
         "61.7.0.0/17",
-        "61.7.64.0/18",
+        "61.7.104.0/22",
         "61.7.32.0/19",
-        "61.7.0.0/19"
+        "61.7.0.0/18",
+        "61.7.0.0/19",
+        "115.69.236.0/24"
       ],
       "detailed_results": [
         {
-          "cidr": "202.126.16.0/22",
-          "test_ip": "202.126.18.81",
+          "cidr": "202.10.96.0/20",
+          "test_ip": "202.10.103.170",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 24229,
-          "country": "JP"
-        },
-        {
-          "cidr": "202.126.16.0/23",
-          "test_ip": "202.126.16.239",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 24229,
-          "country": "JP"
-        },
-        {
-          "cidr": "218.100.15.0/24",
-          "test_ip": "218.100.15.81",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 24229,
+          "asn": 18383,
           "country": "JP"
         },
         {
           "cidr": "61.7.0.0/17",
-          "test_ip": "61.7.63.181",
+          "test_ip": "61.7.64.70",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
@@ -67,8 +49,8 @@
           "country": "JP"
         },
         {
-          "cidr": "61.7.64.0/18",
-          "test_ip": "61.7.96.63",
+          "cidr": "61.7.104.0/22",
+          "test_ip": "61.7.106.91",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
@@ -77,7 +59,16 @@
         },
         {
           "cidr": "61.7.32.0/19",
-          "test_ip": "61.7.48.26",
+          "test_ip": "61.7.47.240",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 18150,
+          "country": "JP"
+        },
+        {
+          "cidr": "61.7.0.0/18",
+          "test_ip": "61.7.32.4",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
@@ -86,11 +77,20 @@
         },
         {
           "cidr": "61.7.0.0/19",
-          "test_ip": "61.7.16.96",
+          "test_ip": "61.7.16.62",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
           "asn": 18150,
+          "country": "JP"
+        },
+        {
+          "cidr": "115.69.236.0/24",
+          "test_ip": "115.69.236.120",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 146984,
           "country": "JP"
         }
       ]
@@ -99,76 +99,76 @@
       "target_cidrs": 7,
       "clean_cidrs_found": 7,
       "saved_cidrs": [
-        "103.164.78.0/24",
-        "103.3.37.0/24",
-        "103.3.36.0/24",
-        "103.3.38.0/24",
-        "203.238.224.0/19",
-        "203.241.220.0/24",
-        "210.98.58.0/24"
+        "203.226.64.0/18",
+        "61.83.192.0/24",
+        "211.171.132.0/24",
+        "118.91.44.0/22",
+        "175.113.167.0/24",
+        "103.127.212.0/24",
+        "103.127.214.0/24"
       ],
       "detailed_results": [
         {
-          "cidr": "103.164.78.0/24",
-          "test_ip": "103.164.78.133",
+          "cidr": "203.226.64.0/18",
+          "test_ip": "203.226.96.61",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 10174,
+          "asn": 10194,
           "country": "KR"
         },
         {
-          "cidr": "103.3.37.0/24",
-          "test_ip": "103.3.37.123",
+          "cidr": "61.83.192.0/24",
+          "test_ip": "61.83.192.124",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 10174,
+          "asn": 131805,
           "country": "KR"
         },
         {
-          "cidr": "103.3.36.0/24",
-          "test_ip": "103.3.36.85",
+          "cidr": "211.171.132.0/24",
+          "test_ip": "211.171.132.180",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 10174,
+          "asn": 131805,
           "country": "KR"
         },
         {
-          "cidr": "103.3.38.0/24",
-          "test_ip": "103.3.38.168",
+          "cidr": "118.91.44.0/22",
+          "test_ip": "118.91.45.185",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 10174,
+          "asn": 10175,
           "country": "KR"
         },
         {
-          "cidr": "203.238.224.0/19",
-          "test_ip": "203.238.239.204",
+          "cidr": "175.113.167.0/24",
+          "test_ip": "175.113.167.137",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 10174,
+          "asn": 10037,
           "country": "KR"
         },
         {
-          "cidr": "203.241.220.0/24",
-          "test_ip": "203.241.220.144",
+          "cidr": "103.127.212.0/24",
+          "test_ip": "103.127.212.175",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 131795,
+          "asn": 10186,
           "country": "KR"
         },
         {
-          "cidr": "210.98.58.0/24",
-          "test_ip": "210.98.58.125",
+          "cidr": "103.127.214.0/24",
+          "test_ip": "103.127.214.81",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 131795,
+          "asn": 10186,
           "country": "KR"
         }
       ]
@@ -177,104 +177,134 @@
       "target_cidrs": 6,
       "clean_cidrs_found": 6,
       "saved_cidrs": [
-        "123.108.126.0/24",
-        "112.78.55.0/24",
-        "112.78.53.0/24",
-        "112.78.52.0/23",
-        "112.78.54.0/24",
-        "175.184.242.0/24"
+        "175.184.241.0/24",
+        "175.184.242.0/24",
+        "103.126.164.0/24",
+        "103.126.164.0/22",
+        "175.184.240.0/24",
+        "103.21.60.0/22"
       ],
       "detailed_results": [
         {
-          "cidr": "123.108.126.0/24",
-          "test_ip": "123.108.126.144",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 131164,
-          "country": "TW"
-        },
-        {
-          "cidr": "112.78.55.0/24",
-          "test_ip": "112.78.55.91",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 131164,
-          "country": "TW"
-        },
-        {
-          "cidr": "112.78.53.0/24",
-          "test_ip": "112.78.53.168",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 131164,
-          "country": "TW"
-        },
-        {
-          "cidr": "112.78.52.0/23",
-          "test_ip": "112.78.53.24",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 131164,
-          "country": "TW"
-        },
-        {
-          "cidr": "112.78.54.0/24",
-          "test_ip": "112.78.54.166",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 131164,
-          "country": "TW"
-        },
-        {
-          "cidr": "175.184.242.0/24",
-          "test_ip": "175.184.242.93",
+          "cidr": "175.184.241.0/24",
+          "test_ip": "175.184.241.111",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
           "asn": 131143,
+          "country": "TW"
+        },
+        {
+          "cidr": "175.184.242.0/24",
+          "test_ip": "175.184.242.150",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 131143,
+          "country": "TW"
+        },
+        {
+          "cidr": "103.126.164.0/24",
+          "test_ip": "103.126.164.132",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 131143,
+          "country": "TW"
+        },
+        {
+          "cidr": "103.126.164.0/22",
+          "test_ip": "103.126.165.245",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 131143,
+          "country": "TW"
+        },
+        {
+          "cidr": "175.184.240.0/24",
+          "test_ip": "175.184.240.89",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 131143,
+          "country": "TW"
+        },
+        {
+          "cidr": "103.21.60.0/22",
+          "test_ip": "103.21.61.176",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 131148,
           "country": "TW"
         }
       ]
     },
     "AE": {
       "target_cidrs": 6,
-      "clean_cidrs_found": 3,
+      "clean_cidrs_found": 6,
       "saved_cidrs": [
-        "64.60.217.0/24",
-        "199.62.128.0/23",
-        "199.62.130.0/24"
+        "210.5.20.0/24",
+        "218.96.244.0/24",
+        "183.91.144.0/22",
+        "210.5.27.0/24",
+        "210.5.18.0/23",
+        "118.129.137.0/24"
       ],
       "detailed_results": [
         {
-          "cidr": "64.60.217.0/24",
-          "test_ip": "64.60.217.98",
+          "cidr": "210.5.20.0/24",
+          "test_ip": "210.5.20.86",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 10951,
+          "asn": 10212,
           "country": "AE"
         },
         {
-          "cidr": "199.62.128.0/23",
-          "test_ip": "199.62.128.156",
+          "cidr": "218.96.244.0/24",
+          "test_ip": "218.96.244.190",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 11247,
+          "asn": 10212,
           "country": "AE"
         },
         {
-          "cidr": "199.62.130.0/24",
-          "test_ip": "199.62.130.173",
+          "cidr": "183.91.144.0/22",
+          "test_ip": "183.91.145.247",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 11247,
+          "asn": 10212,
+          "country": "AE"
+        },
+        {
+          "cidr": "210.5.27.0/24",
+          "test_ip": "210.5.27.140",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 10212,
+          "country": "AE"
+        },
+        {
+          "cidr": "210.5.18.0/23",
+          "test_ip": "210.5.19.33",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 10212,
+          "country": "AE"
+        },
+        {
+          "cidr": "118.129.137.0/24",
+          "test_ip": "118.129.137.160",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 10179,
           "country": "AE"
         }
       ]
@@ -283,66 +313,66 @@
       "target_cidrs": 6,
       "clean_cidrs_found": 6,
       "saved_cidrs": [
-        "203.214.202.0/23",
-        "202.175.141.0/24",
-        "202.36.199.0/24",
-        "202.36.233.0/24",
-        "103.224.107.0/24",
-        "202.59.4.0/22"
+        "202.59.4.0/22",
+        "202.59.4.0/24",
+        "202.59.5.0/24",
+        "202.59.6.0/24",
+        "202.59.7.0/24",
+        "202.86.48.0/22"
       ],
       "detailed_results": [
         {
-          "cidr": "203.214.202.0/23",
-          "test_ip": "203.214.203.58",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 10022,
-          "country": "SA"
-        },
-        {
-          "cidr": "202.175.141.0/24",
-          "test_ip": "202.175.141.73",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 10022,
-          "country": "SA"
-        },
-        {
-          "cidr": "202.36.199.0/24",
-          "test_ip": "202.36.199.110",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 10022,
-          "country": "SA"
-        },
-        {
-          "cidr": "202.36.233.0/24",
-          "test_ip": "202.36.233.88",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 10022,
-          "country": "SA"
-        },
-        {
-          "cidr": "103.224.107.0/24",
-          "test_ip": "103.224.107.103",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 10022,
-          "country": "SA"
-        },
-        {
           "cidr": "202.59.4.0/22",
-          "test_ip": "202.59.6.53",
+          "test_ip": "202.59.6.27",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
           "asn": 10025,
+          "country": "SA"
+        },
+        {
+          "cidr": "202.59.4.0/24",
+          "test_ip": "202.59.4.161",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 10025,
+          "country": "SA"
+        },
+        {
+          "cidr": "202.59.5.0/24",
+          "test_ip": "202.59.5.126",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 10025,
+          "country": "SA"
+        },
+        {
+          "cidr": "202.59.6.0/24",
+          "test_ip": "202.59.6.135",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 10025,
+          "country": "SA"
+        },
+        {
+          "cidr": "202.59.7.0/24",
+          "test_ip": "202.59.7.101",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 10025,
+          "country": "SA"
+        },
+        {
+          "cidr": "202.86.48.0/22",
+          "test_ip": "202.86.49.161",
+          "score": 0.0,
+          "blacklisted": false,
+          "clean": true,
+          "asn": 10023,
           "country": "SA"
         }
       ]
@@ -351,127 +381,77 @@
       "target_cidrs": 6,
       "clean_cidrs_found": 6,
       "saved_cidrs": [
-        "103.22.148.0/24",
-        "103.22.149.0/24",
-        "103.22.151.0/24",
-        "192.82.81.0/24",
-        "192.82.84.0/24",
-        "45.124.98.0/23"
+        "103.24.134.0/24",
+        "103.163.4.0/24",
+        "103.8.24.0/24",
+        "163.47.203.0/24",
+        "163.47.200.0/24",
+        "163.47.201.0/24"
       ],
       "detailed_results": [
         {
-          "cidr": "103.22.148.0/24",
-          "test_ip": "103.22.148.156",
+          "cidr": "103.24.134.0/24",
+          "test_ip": "103.24.134.88",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 131330,
+          "asn": 131332,
           "country": "MY"
         },
         {
-          "cidr": "103.22.149.0/24",
-          "test_ip": "103.22.149.187",
+          "cidr": "103.163.4.0/24",
+          "test_ip": "103.163.4.95",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 131330,
+          "asn": 131332,
           "country": "MY"
         },
         {
-          "cidr": "103.22.151.0/24",
-          "test_ip": "103.22.151.145",
+          "cidr": "103.8.24.0/24",
+          "test_ip": "103.8.24.158",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 131330,
+          "asn": 132241,
           "country": "MY"
         },
         {
-          "cidr": "192.82.81.0/24",
-          "test_ip": "192.82.81.171",
+          "cidr": "163.47.203.0/24",
+          "test_ip": "163.47.203.159",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 141201,
+          "asn": 132241,
           "country": "MY"
         },
         {
-          "cidr": "192.82.84.0/24",
-          "test_ip": "192.82.84.164",
+          "cidr": "163.47.200.0/24",
+          "test_ip": "163.47.200.162",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 141201,
+          "asn": 132241,
           "country": "MY"
         },
         {
-          "cidr": "45.124.98.0/23",
-          "test_ip": "45.124.98.251",
+          "cidr": "163.47.201.0/24",
+          "test_ip": "163.47.201.159",
           "score": 0.0,
           "blacklisted": false,
           "clean": true,
-          "asn": 141201,
+          "asn": 132241,
           "country": "MY"
         }
       ]
     },
     "AU": {
       "target_cidrs": 6,
-      "clean_cidrs_found": 6,
+      "clean_cidrs_found": 1,
       "saved_cidrs": [
-        "103.70.192.0/22",
-        "103.76.158.0/23",
-        "103.244.197.0/24",
-        "103.244.199.0/24",
-        "202.1.233.0/24",
         "103.12.165.0/24"
       ],
       "detailed_results": [
-        {
-          "cidr": "103.70.192.0/22",
-          "test_ip": "103.70.194.52",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 132113,
-          "country": "AU"
-        },
-        {
-          "cidr": "103.76.158.0/23",
-          "test_ip": "103.76.159.18",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 132113,
-          "country": "AU"
-        },
-        {
-          "cidr": "103.244.197.0/24",
-          "test_ip": "103.244.197.134",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 132532,
-          "country": "AU"
-        },
-        {
-          "cidr": "103.244.199.0/24",
-          "test_ip": "103.244.199.187",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 132532,
-          "country": "AU"
-        },
-        {
-          "cidr": "202.1.233.0/24",
-          "test_ip": "202.1.233.87",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 131225,
-          "country": "AU"
-        },
         {
           "cidr": "103.12.165.0/24",
           "test_ip": "103.12.165.72",
@@ -485,76 +465,14 @@
     },
     "BR": {
       "target_cidrs": 6,
-      "clean_cidrs_found": 6,
-      "saved_cidrs": [
-        "200.192.232.0/24",
-        "200.192.232.0/23",
-        "200.192.233.0/24",
-        "200.218.141.0/24",
-        "200.218.185.0/24",
-        "200.218.147.0/24"
-      ],
-      "detailed_results": [
-        {
-          "cidr": "200.192.232.0/24",
-          "test_ip": "200.192.232.123",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 11284,
-          "country": "BR"
-        },
-        {
-          "cidr": "200.192.232.0/23",
-          "test_ip": "200.192.233.71",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 11284,
-          "country": "BR"
-        },
-        {
-          "cidr": "200.192.233.0/24",
-          "test_ip": "200.192.233.98",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 11284,
-          "country": "BR"
-        },
-        {
-          "cidr": "200.218.141.0/24",
-          "test_ip": "200.218.141.165",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 11271,
-          "country": "BR"
-        },
-        {
-          "cidr": "200.218.185.0/24",
-          "test_ip": "200.218.185.108",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 11271,
-          "country": "BR"
-        },
-        {
-          "cidr": "200.218.147.0/24",
-          "test_ip": "200.218.147.88",
-          "score": 0.0,
-          "blacklisted": false,
-          "clean": true,
-          "asn": 11271,
-          "country": "BR"
-        }
-      ]
+      "clean_cidrs_found": 0,
+      "saved_cidrs": [],
+      "detailed_results": []
     }
   },
   "summary": {
     "countries_processed": 8,
-    "countries_with_results": 8
+    "countries_with_results": 7
   },
   "environment": {
     "github_actions": true,
