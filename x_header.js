@@ -95,7 +95,7 @@ function generateMessageId(domain) {
   const d = domain || 'localhost';
   
   // Timestamp-first approach with various server-like formats
-  const formatType = cryptoRandom(0, 3);
+  const formatType = cryptoRandom(0, 3);  // 0, 1, 2, or 3
   
   if (formatType === 0) {
     // Unix timestamp + UUID-like (no hyphens)
@@ -126,7 +126,7 @@ function generateMessageId(domain) {
 
 function generateBoundary() {
   // Wide variety of MIME boundary styles, avoiding standard patterns
-  const styleType = cryptoRandom(0, 4);
+  const styleType = cryptoRandom(0, 4);  // 0, 1, 2, 3, or 4
   
   if (styleType === 0) {
     // Underscore-heavy style
@@ -154,7 +154,7 @@ function generateBoundary() {
 
 function generateFeedbackId(campaignId, rootDomain) {
   // Changed separators and format components
-  const formatType = cryptoRandom(0, 2);
+  const formatType = cryptoRandom(0, 2);  // 0, 1, or 2
   
   if (formatType === 0) {
     // Pipe-separated with different scopes
@@ -192,7 +192,7 @@ function generateHeaderOrder(headersToAdd) {
   };
 
   // Different grouping strategy: sometimes group differently
-  const groupType = cryptoRandom(0, 2);
+  const groupType = cryptoRandom(0, 2);  // 0, 1, or 2
   
   if (groupType === 0) {
     // Full shuffle - no constraints
@@ -273,7 +273,7 @@ function genPlatformSnippet() {
 
   if (fam === 'Windows') {
     const winVers = ['11.0', '11.0', '10.0']; // Favor Windows 11
-    const archs = ['Win64; x64', 'ARM64'];
+    const archs = ['Win64; x64', 'WOW64', 'ARM64'];
     return `Windows NT ${pick(winVers)}; ${pick(archs)}`;
   }
 
@@ -308,7 +308,7 @@ function synthesizeUserAgent(clientType) {
 
   if (clientType === 'thunderbird') {
     // Modern Mozilla-style UA
-    return `Mozilla/5.0 (${plat}; rv:${rv}.0) Gecko/${gecko} Thunderbird/${v.major + 100}.${v.minor}.${v.patch}`;
+    return `Mozilla/5.0 (${plat}; rv:${rv}.0) Gecko/${gecko} Thunderbird/${rv}.${v.minor}.${v.patch}`;
   }
 
   if (clientType === 'outlook') {
@@ -394,7 +394,7 @@ function generateClientFingerprint(clientType, domain) {
 
 function generateCampaignId() {
   // Changed prefix and generation pattern
-  const formatType = cryptoRandom(0, 2);
+  const formatType = cryptoRandom(0, 2);  // 0, 1, or 2
   
   if (formatType === 0) {
     // Hex timestamp with alphanumeric suffix
