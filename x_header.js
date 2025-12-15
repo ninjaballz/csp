@@ -91,103 +91,99 @@ function deriveUnsubHost(fromAddress) {
 
 // ---------- Message-ID (procedural; always unique) ----------
 
-function generateMessageId(domain) {
+function generateMessageId(domain, clientType) {
   const d = domain || 'localhost';
-  const ts = Date.now().toString(36);
-  const rid = randBytesHex(8);
-  const segments = [];
-
-  const segmentOptions = [
-    () => randBytesHex(8),
-    () => randBytesHex(12),
-    () => randBytesHex(16),
-    () => randAlphaNum(8),
-    () => randAlphaNum(12),
-    () => randDigits(6),
-    () => ts,
-  ];
-
-  const partCount = cryptoRandom(2, 4);
-  for (let i = 0; i < partCount; i++) {
-    segments.push(pick(segmentOptions)());
+  
+  // 1. Apple Mail Style: <UUID@domain>
+  if (clientType === 'appleMail') {
+    return `<${crypto.randomUUID().toUpperCase()}@${d}>`;
   }
 
-  // Random delimiters to increase entropy/fingerprint variety
-  const delimiters = ['.', '-', '_', ''];
-  const delim = pick(delimiters);
+  // 2. Outlook/Exchange Style: <32Hex@domain> or <Base64@domain>
+  if (clientType === 'outlook') {
+    const id = randBytesHex(16).toUpperCase();
+    // Occasional variation with timestamps
+    if (cryptoRandom(0, 1) === 1) {
+        return `<${id}.${Date.now()}@${d}>`;
+    }
+    return `<${id}@${d}>`;
+  }
 
-  const left = segments.join(delim);
-  return `<${left}@${d}>`;
+  // 3. Gmail/Generic Style: <randomString@domain>
+  // Often ~20-30 chars, mixed case
+  if (clientType === 'gmail') {
+    return `<${randAlphaNum(22 + cryptoRandom(0, 10))}@${d}>`;
+  }
+
+  // 4. Thunderbird/Mozilla Style: <UUID-like-but-not-quite@domain>
+  if (clientType === 'thunderbird') {
+    return `<${crypto.randomUUID()}@${d}>`;
+  }
+
+  // 5. Fallback / High Entropy
+  const ts = Date.now().toString(36);
+  const r = randAlphaNum(16);
+  return `<${ts}.${r}@${d}>`;
 }
 
 // ---------- MIME boundary (procedural; always unique) ----------
 
-function generateBoundary() {
-  // Avoid creating any recognizable fixed boundary strings; always unique and random
-  // Commonly boundaries include dashes and base64/hex-like tokens.
-  const prefixOptions = [
-    '----',
-    '----=_',
-    '----=',
-    '--',
-    '==',
-    '',
-  ];
-  const suffixOptions = ['', '==', '--', '_____'];
+function generateBoundary(clientType) {
+  // 1. Apple Mail: Apple-Mail-UUID
+  if (clientType === 'appleMail') {
+    return `Apple-Mail-${crypto.randomUUID().toUpperCase()}`;
+  }
 
-  const prefix = pick(prefixOptions);
-  const core = randAlphaNum(8) + randBase64Url(12) + randBytesHex(6);
-  const suffix = pick(suffixOptions);
+  // 2. Webkit/Gecko style: ------------Random
+  if (clientType === 'thunderbird' || clientType === 'gmail') {
+    return `------------${randBytesHex(12).toUpperCase()}`;
+  }
 
-  return `${prefix}${core}${suffix}`;
+  // 3. Outlook/Exchange: _000_UUID_
+  if (clientType === 'outlook') {
+    return `_000_${crypto.randomUUID()}_`;
+  }
+
+  // 4. Generic Multipart
+  return `----=_Part_${cryptoRandom(1000, 99999)}_${randBytesHex(4)}.${Date.now()}`;
 }
 
 // ---------- Feedback-ID (procedural; always unique) ----------
 
 function generateFeedbackId(campaignId, rootDomain) {
-  // Format: <scope>:<campaign-like>:<token>:<domain>
-  // All components include random elements so that it’s unique per message
-  const scopes = ['campaign', 'mail', 'msg', 'bulk', 'newsletter', 'flow', 'journey'];
-  const scope = pick(scopes);
-  const token = randBytesHex(3) + '-' + randAlphaNum(4);
-  const c = `${campaignId}-${randDigits(3)}`;
-
-  return `${scope}:${c}:${token}:${rootDomain}`;
+  // New format: campaignId:unique_trace:timestamp
+  // Avoids the previous scope:campaign:token:domain pattern
+  return `${campaignId}:${randAlphaNum(12)}:${Math.floor(Date.now() / 1000)}`;
 }
 
 // ---------- Header order (procedural shuffle with soft constraints) ----------
 
-function generateHeaderOrder(headersToAdd) {
-  // headersToAdd: array of header names we plan to add
-  const base = Array.from(new Set(headersToAdd.map(h => h.toString())));
-  // Ensure some canonical presence/order hints:
-  // - Prefer (Date, From, To, Subject) near top
-  // - Keep MIME-Version before Content-Type if both exist
-  const priTop = base.filter(h => ['Date', 'From', 'To', 'Subject'].includes(h));
-  const remainder = base.filter(h => !priTop.includes(h));
+function generateHeaderOrder(headersToAdd, clientType) {
+  // Enforce strict ordering based on client persona to look authentic
+  const all = new Set(headersToAdd.map(h => h.toString()));
+  let order = [];
 
-  // Shuffle function
-  const shuffle = (arr) => {
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = cryptoRandom(0, i);
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  };
-
-  shuffle(priTop);
-  shuffle(remainder);
-
-  let ordered = [...priTop, ...remainder];
-
-  // Enforce MIME-Version before Content-Type if both present
-  const mi = ordered.indexOf('MIME-Version');
-  const ci = ordered.indexOf('Content-Type');
-  if (mi >= 0 && ci >= 0 && mi > ci) {
-    [ordered[mi], ordered[ci]] = [ordered[ci], ordered[mi]];
+  if (clientType === 'outlook') {
+    // Outlook typical order
+    order = ['From', 'To', 'Cc', 'Subject', 'Thread-Topic', 'Thread-Index', 'Date', 'Message-ID', 'Accept-Language', 'Content-Language', 'X-MS-Has-Attach', 'X-MS-TNEF-Correlator', 'x-originating-ip', 'Content-Type', 'MIME-Version'];
+  } else if (clientType === 'appleMail') {
+    // Apple Mail typical order
+    order = ['From', 'Content-Type', 'MIME-Version', 'Subject', 'Date', 'Message-Id', 'To'];
+  } else {
+    // Generic / Thunderbird
+    order = ['Message-ID', 'Date', 'MIME-Version', 'User-Agent', 'Subject', 'Content-Language', 'From', 'To', 'Content-Type'];
   }
 
-  return ordered;
+  // Add any remaining headers that weren't in the strict list
+  const remaining = [...all].filter(h => !order.some(o => o.toLowerCase() === h.toLowerCase()));
+  
+  // Shuffle remaining slightly
+  for (let i = remaining.length - 1; i > 0; i--) {
+    const j = cryptoRandom(0, i);
+    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+  }
+
+  return [...order, ...remaining];
 }
 
 // ---------- Client selection and UA/X-Mailer synthesis ----------
@@ -278,18 +274,15 @@ function synthesizeUserAgent(clientType) {
   const build = `${randDigits(2)}.${randDigits(4)}`;
 
   if (clientType === 'thunderbird') {
-    // Mozilla-style UA
-    return `Mozilla/5.0 (${plat}; rv:${rv}.0) Gecko/${gecko} Thunderbird/${v.text}`;
+    // Thunderbird 115 "Supernova" / 128 Nebula
+    const v = pick(['115.6.0', '115.7.0', '115.8.1', '128.0.1esr']);
+    return `Mozilla/5.0 (${plat}; rv:109.0) Gecko/${gecko} Thunderbird/${v}`;
   }
 
   if (clientType === 'outlook') {
-    // Outlook tends to be X-Mailer not UA, but when synthesized:
-    const flvs = [`${v.major}.0`, `${v.major}.${v.minor}`];
-    const variants = [
-      `Microsoft Outlook ${pick(flvs)} (${build})`,
-      `Outlook-Desktop/${v.major}.0.${v.minor}`,
-    ];
-    return pick(variants);
+    // Microsoft Outlook 16.0
+    const build = cryptoRandom(16000, 17500);
+    return `Microsoft Outlook 16.0.${build}.20000`;
   }
 
   if (clientType === 'appleMail') {
@@ -321,12 +314,10 @@ function synthesizeUserAgent(clientType) {
 
 function generateClientFingerprint(clientType, domain) {
   const userAgent = synthesizeUserAgent(clientType);
-  const messageId = generateMessageId(domain || 'localhost');
-  const boundary = generateBoundary();
+  const messageId = generateMessageId(domain || 'localhost', clientType);
+  const boundary = generateBoundary(clientType);
 
-  // Always use X-Mailer; never synthesize 'User-Agent' for email
-  const headerType = 'X-Mailer';
-
+  // USER REQUEST: "no need the x mailer" -> Removed X-Mailer from order list
   // Determine a randomized order for the headers we might add
   const headerOrderCandidate = generateHeaderOrder([
     'Date',
@@ -334,7 +325,6 @@ function generateClientFingerprint(clientType, domain) {
     'To',
     'Subject',
     'Message-ID',
-    headerType,
     'MIME-Version',
     'Content-Type',
     'List-Unsubscribe',
@@ -343,7 +333,7 @@ function generateClientFingerprint(clientType, domain) {
     'Precedence',
     'Auto-Submitted',
     'X-Priority',
-  ]);
+  ], clientType);
 
   return {
     clientType,
@@ -351,7 +341,6 @@ function generateClientFingerprint(clientType, domain) {
     messageId,
     boundary,
     headerOrder: headerOrderCandidate,
-    headerType,
     version: randDigits(2) + '.' + randDigits(2) + '.' + randDigits(2), // not used externally but kept for parity
     uniqueId: randBytesHex(16)
   };
@@ -447,7 +436,6 @@ function buildConfig(fromAddress, toAddress) {
     messageId: fingerprint.messageId,
     boundary: fingerprint.boundary,
     headerOrder: fingerprint.headerOrder,
-    headerType: fingerprint.headerType,
     uniqueId: fingerprint.uniqueId,
 
     addPrecedence,
@@ -502,9 +490,12 @@ function addHeaders(txn, config, unsubData) {
   }
 
   // Only add X-Mailer if none exist (never add 'User-Agent')
+  // USER REQUEST: "no need the x mailer" -> Disabled X-Mailer addition
+  /*
   if (!hasExistingMailer && config.userAgent) {
     headers.set('X-Mailer', config.userAgent);
   }
+  */
 
   // List-Unsubscribe
   if (unsubData) {
@@ -545,7 +536,7 @@ function addHeaders(txn, config, unsubData) {
 // ---------- Haraka plugin exports ----------
 
 exports.register = function() {
-  this.loginfo('Ultra-Unique header plugin loaded (algorithmic; preserves existing; adds X-Mailer only, never User-Agent)');
+  this.loginfo('Ultra-Unique header plugin loaded (algorithmic; preserves existing; X-Mailer disabled)');
 };
 
 exports.hook_data_post = function(next, connection) {
