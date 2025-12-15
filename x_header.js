@@ -93,79 +93,95 @@ function deriveUnsubHost(fromAddress) {
 
 function generateMessageId(domain) {
   const d = domain || 'localhost';
-  const ts = Date.now().toString(36);
-  const rid = randBytesHex(8);
-  const segments = [];
-
-  const segmentOptions = [
-    () => randBytesHex(8),
-    () => randBytesHex(12),
-    () => randBytesHex(16),
-    () => randAlphaNum(8),
-    () => randAlphaNum(12),
-    () => randDigits(6),
-    () => ts,
-  ];
-
-  const partCount = cryptoRandom(2, 4);
-  for (let i = 0; i < partCount; i++) {
-    segments.push(pick(segmentOptions)());
+  
+  // Timestamp-first approach with various server-like formats
+  const formatType = cryptoRandom(0, 3);  // 0, 1, 2, or 3
+  
+  if (formatType === 0) {
+    // Unix timestamp + UUID-like (no hyphens)
+    const ts = Date.now();
+    const uuid = randBytesHex(16);
+    return `<${ts}${uuid}@${d}>`;
+  } else if (formatType === 1) {
+    // Base36 timestamp + compact alphanumeric
+    const ts = Date.now().toString(36).toUpperCase();
+    const rand = randAlphaNum(20);
+    return `<${ts}${rand}@${d}>`;
+  } else if (formatType === 2) {
+    // ISO-like timestamp + base64url
+    const now = new Date();
+    const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+    const rand = randBase64Url(12);
+    return `<${ts}.${rand}@${d}>`;
+  } else {
+    // Hex timestamp + double hex string (no delimiters)
+    const ts = Date.now().toString(16);
+    const r1 = randBytesHex(6);
+    const r2 = randBytesHex(10);
+    return `<${ts}${r1}${r2}@${d}>`;
   }
-
-  // Random delimiters to increase entropy/fingerprint variety
-  const delimiters = ['.', '-', '_', ''];
-  const delim = pick(delimiters);
-
-  const left = segments.join(delim);
-  return `<${left}@${d}>`;
 }
 
 // ---------- MIME boundary (procedural; always unique) ----------
 
 function generateBoundary() {
-  // Avoid creating any recognizable fixed boundary strings; always unique and random
-  // Commonly boundaries include dashes and base64/hex-like tokens.
-  const prefixOptions = [
-    '----',
-    '----=_',
-    '----=',
-    '--',
-    '==',
-    '',
-  ];
-  const suffixOptions = ['', '==', '--', '_____'];
-
-  const prefix = pick(prefixOptions);
-  const core = randAlphaNum(8) + randBase64Url(12) + randBytesHex(6);
-  const suffix = pick(suffixOptions);
-
-  return `${prefix}${core}${suffix}`;
+  // Wide variety of MIME boundary styles, avoiding standard patterns
+  const styleType = cryptoRandom(0, 4);  // 0, 1, 2, 3, or 4
+  
+  if (styleType === 0) {
+    // Underscore-heavy style
+    const parts = [randAlphaNum(8), randAlphaNum(12), randBytesHex(8)];
+    return parts.join('_');
+  } else if (styleType === 1) {
+    // Dot-separated alphanumeric
+    const parts = [randAlphaNum(6), randAlphaNum(10), randAlphaNum(8)];
+    return parts.join('.');
+  } else if (styleType === 2) {
+    // Pure alphanumeric (no delimiters)
+    return randAlphaNum(32);
+  } else if (styleType === 3) {
+    // Mixed with equals and underscores
+    const core = randBase64Url(20);
+    return `${randAlpha(4)}_${core}_${randAlphaNum(6)}`;
+  } else {
+    // Double dash prefix with base64url
+    const core = randBase64Url(24);
+    return `--${core}`;
+  }
 }
 
 // ---------- Feedback-ID (procedural; always unique) ----------
 
 function generateFeedbackId(campaignId, rootDomain) {
-  // Format: <scope>:<campaign-like>:<token>:<domain>
-  // All components include random elements so that it’s unique per message
-  const scopes = ['campaign', 'mail', 'msg', 'bulk', 'newsletter', 'flow', 'journey'];
-  const scope = pick(scopes);
-  const token = randBytesHex(3) + '-' + randAlphaNum(4);
-  const c = `${campaignId}-${randDigits(3)}`;
-
-  return `${scope}:${c}:${token}:${rootDomain}`;
+  // Changed separators and format components
+  const formatType = cryptoRandom(0, 2);  // 0, 1, or 2
+  
+  if (formatType === 0) {
+    // Pipe-separated with different scopes
+    const scopes = ['msg', 'stream', 'batch', 'send', 'delivery', 'dispatch'];
+    const scope = pick(scopes);
+    const token = randBase64Url(8);
+    const c = `${campaignId}.${randAlphaNum(4)}`;
+    return `${scope}|${c}|${token}|${rootDomain}`;
+  } else if (formatType === 1) {
+    // Slash-separated with numeric prefix
+    const prefix = randDigits(5);
+    const token = randBytesHex(6);
+    return `${prefix}/${campaignId}/${token}/${rootDomain}`;
+  } else {
+    // Dot-separated with timestamp
+    const ts = Date.now().toString(36);
+    const token = randAlphaNum(8);
+    return `${campaignId}.${ts}.${token}.${rootDomain}`;
+  }
 }
 
 // ---------- Header order (procedural shuffle with soft constraints) ----------
 
 function generateHeaderOrder(headersToAdd) {
-  // headersToAdd: array of header names we plan to add
+  // New shuffling: don't always pin Date/From/To/Subject to top
   const base = Array.from(new Set(headersToAdd.map(h => h.toString())));
-  // Ensure some canonical presence/order hints:
-  // - Prefer (Date, From, To, Subject) near top
-  // - Keep MIME-Version before Content-Type if both exist
-  const priTop = base.filter(h => ['Date', 'From', 'To', 'Subject'].includes(h));
-  const remainder = base.filter(h => !priTop.includes(h));
-
+  
   // Shuffle function
   const shuffle = (arr) => {
     for (let i = arr.length - 1; i > 0; i--) {
@@ -175,49 +191,62 @@ function generateHeaderOrder(headersToAdd) {
     return arr;
   };
 
-  shuffle(priTop);
-  shuffle(remainder);
-
-  let ordered = [...priTop, ...remainder];
-
-  // Enforce MIME-Version before Content-Type if both present
-  const mi = ordered.indexOf('MIME-Version');
-  const ci = ordered.indexOf('Content-Type');
-  if (mi >= 0 && ci >= 0 && mi > ci) {
-    [ordered[mi], ordered[ci]] = [ordered[ci], ordered[mi]];
+  // Different grouping strategy: sometimes group differently
+  const groupType = cryptoRandom(0, 2);  // 0, 1, or 2
+  
+  if (groupType === 0) {
+    // Full shuffle - no constraints
+    shuffle(base);
+    return base;
+  } else if (groupType === 1) {
+    // Group MIME headers together, shuffle rest
+    const mimeHeaders = base.filter(h => ['MIME-Version', 'Content-Type'].includes(h));
+    const remainder = base.filter(h => !mimeHeaders.includes(h));
+    shuffle(remainder);
+    const insertPos = cryptoRandom(0, remainder.length);
+    return [...remainder.slice(0, insertPos), ...mimeHeaders, ...remainder.slice(insertPos)];
+  } else {
+    // Put Subject/Message-ID near end sometimes
+    const endHeaders = base.filter(h => ['Subject', 'Message-ID'].includes(h));
+    const remainder = base.filter(h => !endHeaders.includes(h));
+    shuffle(remainder);
+    shuffle(endHeaders);
+    return [...remainder, ...endHeaders];
   }
-
-  return ordered;
 }
 
 // ---------- Client selection and UA/X-Mailer synthesis ----------
 
 function selectEmailClient(fromAddress) {
-  // Lightweight, domain-influenced selection with randomization
+  // Updated client pools and weighting logic
   const f = (fromAddress || '').toLowerCase();
 
-  const pool = ['thunderbird', 'outlook', 'appleMail', 'gmail', 'evolution', 'other'];
+  const pool = ['thunderbird', 'outlook', 'appleMail', 'gmail', 'mailspring', 'spark', 'other'];
   let weight = {
-    thunderbird: 10,
-    outlook: 12,
-    appleMail: 8,
-    gmail: 7,
-    evolution: 4,
-    other: 6,
+    thunderbird: 8,
+    outlook: 15,
+    appleMail: 10,
+    gmail: 9,
+    mailspring: 5,
+    spark: 6,
+    other: 7,
   };
 
-  // Domain hints (not hardcoded templates; just simple biases)
-  if (f.includes('gmail')) weight.gmail += cryptoRandom(3, 6);
-  if (f.includes('outlook') || f.includes('hotmail') || f.includes('office')) weight.outlook += cryptoRandom(3, 6);
-  if (f.includes('icloud') || f.includes('me.com') || f.endsWith('.mac.com')) weight.appleMail += cryptoRandom(3, 6);
+  // Adjusted domain hints with different logic
+  if (f.includes('gmail')) weight.gmail += cryptoRandom(5, 9);
+  if (f.includes('outlook') || f.includes('hotmail') || f.includes('office')) weight.outlook += cryptoRandom(4, 8);
+  if (f.includes('icloud') || f.includes('me.com') || f.endsWith('.mac.com')) {
+    weight.appleMail += cryptoRandom(5, 10);
+    weight.spark += cryptoRandom(2, 5);
+  }
   if (f.endsWith('.jp') || f.includes('.co.jp')) {
-    weight.thunderbird += cryptoRandom(2, 5);
-    weight.other += cryptoRandom(1, 3);
+    weight.thunderbird += cryptoRandom(3, 7);
+    weight.other += cryptoRandom(2, 4);
   }
 
-  // Add noise
+  // Different noise pattern
   for (const k of Object.keys(weight)) {
-    weight[k] = Math.max(1, Math.floor(weight[k] * (cryptoRandom(80, 120) / 100)));
+    weight[k] = Math.max(1, Math.floor(weight[k] * (cryptoRandom(70, 130) / 100)));
   }
 
   const total = Object.values(weight).reduce((a, b) => a + b, 0);
@@ -226,7 +255,7 @@ function selectEmailClient(fromAddress) {
     r -= weight[k];
     if (r <= 0) return k;
   }
-  return 'thunderbird';
+  return 'outlook';
 }
 
 function genSemver(majorRange = [1, 20]) {
@@ -238,83 +267,89 @@ function genSemver(majorRange = [1, 20]) {
 }
 
 function genPlatformSnippet() {
-  // Small modular pools; no huge static lists
+  // Updated with modern OS versions
   const osFamilies = ['Windows', 'macOS', 'Linux', 'iOS', 'Android'];
   const fam = pick(osFamilies);
 
   if (fam === 'Windows') {
-    const winVers = ['10.0', '11.0'];
-    const archs = ['Win64; x64', 'WOW64'];
+    const winVers = ['11.0', '11.0', '10.0']; // Favor Windows 11
+    const archs = ['Win64; x64', 'WOW64', 'ARM64'];
     return `Windows NT ${pick(winVers)}; ${pick(archs)}`;
   }
 
   if (fam === 'macOS') {
-    const macVers = ['10_15_7', '11_7', '12_7', '13_6', '14_1'];
+    const macVers = ['14_2', '14_3', '14_4', '15_0', '15_1', '13_6'];
     return `Macintosh; Intel Mac OS X ${pick(macVers)}`;
   }
 
   if (fam === 'Linux') {
-    const distros = ['X11; Linux x86_64', 'X11; Ubuntu; Linux x86_64', 'X11; Fedora; Linux x86_64'];
+    const distros = ['X11; Linux x86_64', 'X11; Ubuntu; Linux x86_64', 'X11; Arch Linux; x86_64', 'X11; Debian; Linux x86_64'];
     return pick(distros);
   }
 
   if (fam === 'iOS') {
     const devices = ['iPhone', 'iPad'];
-    const iosVers = ['15_7', '16_7', '17_3'];
+    const iosVers = ['17_2', '17_3', '17_4', '18_0'];
     return `iOS/${pick(iosVers)}; ${pick(devices)}`;
   }
 
   // Android
-  const andVers = ['11', '12', '13', '14'];
+  const andVers = ['13', '14', '15'];
   return `Android ${pick(andVers)}; Mobile`;
 }
 
 function synthesizeUserAgent(clientType) {
-  // Realistic but procedurally varied UA/X-Mailer
+  // Updated client versions and variations
   const plat = genPlatformSnippet();
-  const rv = cryptoRandom(60, 130);
+  const rv = cryptoRandom(115, 135); // Modern Firefox versions
   const gecko = '20100101';
-  const v = genSemver([1, 20]);
-  const build = `${randDigits(2)}.${randDigits(4)}`;
+  const v = genSemver([10, 25]); // Higher version numbers
+  const build = `${randDigits(3)}.${randDigits(5)}`;
 
   if (clientType === 'thunderbird') {
-    // Mozilla-style UA
-    return `Mozilla/5.0 (${plat}; rv:${rv}.0) Gecko/${gecko} Thunderbird/${v.text}`;
+    // Modern Mozilla-style UA
+    return `Mozilla/5.0 (${plat}; rv:${rv}.0) Gecko/${gecko} Thunderbird/${rv}.${v.minor}.${v.patch}`;
   }
 
   if (clientType === 'outlook') {
-    // Outlook tends to be X-Mailer not UA, but when synthesized:
-    const flvs = [`${v.major}.0`, `${v.major}.${v.minor}`];
+    // Modern Outlook versions
     const variants = [
-      `Microsoft Outlook ${pick(flvs)} (${build})`,
-      `Outlook-Desktop/${v.major}.0.${v.minor}`,
+      `Microsoft Outlook ${v.major + 10}.0 (${build})`,
+      `Outlook-Desktop/${v.major + 10}.${v.minor}.${v.patch}`,
+      `Microsoft Office Outlook ${v.major + 10}`,
     ];
     return pick(variants);
   }
 
   if (clientType === 'appleMail') {
     const variants = [
-      `Apple Mail (${v.major}.${v.minor})`,
-      `Mail/${v.major}.${v.minor} (macOS)`,
+      `Apple Mail (${v.major + 10}.${v.minor})`,
+      `Mail/${v.major + 10}.${v.minor} (macOS)`,
+      `AppleMail/${v.major + 10}.${v.minor}.${v.patch}`,
     ];
     return pick(variants);
   }
 
   if (clientType === 'gmail') {
     const variants = [
-      `Gmail/${v.major}.${v.minor}`,
-      `Google Mail/${v.major}.${v.minor}`,
+      `Gmail/${v.major + 20}.${v.minor}`,
+      `Google Mail/${v.major + 20}.${v.minor}`,
       `Gmail API v${v.major}`,
+      `Gmail-Client/${v.major + 20}.${v.minor}.${v.patch}`,
     ];
     return pick(variants);
   }
 
-  if (clientType === 'evolution') {
-    return `Evolution ${v.major}.${v.minor}.${v.patch}`;
+  if (clientType === 'mailspring') {
+    return `Mailspring ${v.major}.${v.minor}.${v.patch}`;
+  }
+
+  if (clientType === 'spark') {
+    return `Spark ${v.major}.${v.minor}.${v.patch}`;
   }
 
   // other
-  const names = ['MailClient', 'Postbox', 'Mailbird', 'Mailspring', 'K-9 Mail', 'Geary'];
+  const names = ['ProtonMail', 'Fastmail', 'Mailbird', 'Canary Mail', 'eM Client', 'BlueMail'];
   const name = pick(names);
   return `${name}/${v.text}`;
 }
@@ -358,11 +393,27 @@ function generateClientFingerprint(clientType, domain) {
 }
 
 function generateCampaignId() {
-  // Always unique; no static seeds
-  const a = Date.now().toString(36);
-  const b = randBytesHex(2);
-  const c = randAlphaNum(6);
-  return `c${a}${b}${c}`;
+  // Changed prefix and generation pattern
+  const formatType = cryptoRandom(0, 2);  // 0, 1, or 2
+  
+  if (formatType === 0) {
+    // Hex timestamp with alphanumeric suffix
+    const ts = Date.now().toString(16);
+    const suffix = randAlphaNum(10);
+    return `${ts}${suffix}`;
+  } else if (formatType === 1) {
+    // Base64url prefix with hex
+    const prefix = randBase64Url(4);
+    const mid = Date.now().toString(36);
+    const suffix = randBytesHex(4);
+    return `${prefix}_${mid}_${suffix}`;
+  } else {
+    // Pure alphanumeric with timestamp
+    const ts = Date.now().toString(36);
+    const pre = randAlphaNum(4);
+    const post = randAlphaNum(8);
+    return `${pre}${ts}${post}`;
+  }
 }
 
 function generateUnsubToken(email, campaign, secret) {
