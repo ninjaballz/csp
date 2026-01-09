@@ -65,7 +65,7 @@ jobs:
         find . -name "check.py" -type f
         echo "Running script..."
         if [ -f "check.py" ]; then
-          python check.py --countries "$COUNTRIES" --total-cidrs "$TOTAL_CIDRS"
+          python check.py 
         else
           echo "Error: check.py not found!"
           exit 1
