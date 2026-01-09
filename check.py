@@ -147,7 +147,13 @@ def main():
     parser.add_argument(
         '-f', '--flat',
         action='store_true',
-        help='Output flat list (CIDR only, no country labels)'
+        default=True,
+        help='Output flat list (CIDR only, no country labels) - default: True'
+    )
+    parser.add_argument(
+        '-g', '--grouped',
+        action='store_true',
+        help='Output grouped by country with headers'
     )
     parser.add_argument(
         '-o', '--output',
@@ -169,19 +175,19 @@ def main():
     # Build output
     output_lines = []
     
-    if args.flat:
-        # Flat list - just CIDRs
-        all_cidrs = []
-        for cidrs in results.values():
-            all_cidrs.extend(cidrs)
-        random.shuffle(all_cidrs)
-        output_lines = all_cidrs
-    else:
+    if args.grouped:
         # Grouped by country
         for country, cidrs in sorted(results.items()):
             output_lines.append(f"# {country}")
             output_lines.extend(cidrs)
             output_lines.append("")
+    else:
+        # Flat list - just CIDRs (default)
+        all_cidrs = []
+        for cidrs in results.values():
+            all_cidrs.extend(cidrs)
+        random.shuffle(all_cidrs)
+        output_lines = all_cidrs
     
     output_text = '\n'.join(output_lines)
     
