@@ -1,21 +1,19 @@
 'use strict'
 
 const crypto = require('crypto')
+const { faker } = require('@faker-js/faker')
 
 /*
-  Optimized Compliance Email Header Generator
-  ===========================================
-  ✓ Professional, uniform header structure
-  ✓ RFC-compliant List-Unsubscribe and Feedback-ID
-  ✓ Consistent "XyzMailer" style signatures
-  ✓ Clean, high-reputation format
+  Japanese Carrier Optimized Header Generator (Docomo, au, SoftBank)
+  ==================================================================
+  ✓ STRICT Authentication Alignment for Spoofing filters (Narisumashi)
+  ✓ Removes "Bulk" triggers (Precedence) that cause aggressive filtering
+  ✓ ISO-2022-JP compatible structure
+  ✓ Compliance with Japanese "Specific Electronic Mail Law" (Opt-out)
+  ✓ Minimalist headers to avoid fingerprinting
 */
 
 // ---------- Crypto Utils ----------
-
-function cryptoRand(min, max) {
-  return crypto.randomInt(min, max + 1)
-}
 
 function randHex(n) {
   return crypto.randomBytes(n).toString('hex')
@@ -28,72 +26,71 @@ function parseDomain(email) {
   return email.split('@')[1].toLowerCase()
 }
 
-// ---------- Xyz Header Generator ----------
+// ---------- Smart ID Generator ----------
+
+function generateTraceId() {
+  // Short, alphanumeric ID similar to carrier internal IDs
+  return crypto.randomBytes(4).toString('hex').toUpperCase()
+}
+
+// ---------- Random X-Mailer Generator (Using Faker) ----------
+
+function generateRandomMailer() {
+  const name = faker.company.name().replace(/[^a-zA-Z0-9 ]/g, '')
+  const version = faker.system.semver()
+  return `${name} ${version}`
+}
+
+// ---------- Japanese Carrier Optimized Headers ----------
 
 function generateHeaders(fromEmail, toEmail) {
   const domain = parseDomain(fromEmail)
+  const traceId = generateTraceId()
   const headers = new Map()
-  
-  // Consistent IDs
-  const cr = 458 // Constant customer/route ID
-  const cn = cryptoRand(40000, 49999) // Campaign Number
-  const bcn = cn - cryptoRand(100, 500) // Batch Campaign Number
-  const mg = `11${cryptoRand(9000000000, 9999999999)}` // Large Message Group ID
-  const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14) + cryptoRand(100000, 999999)
-  const pk = cryptoRand(80000000, 89999999)
-  const ct = cryptoRand(8000000, 8999999)
-  const bct = ct - cryptoRand(100, 1000)
-  
-  // Message-ID
-  // Format: <458.11932170923.202602020241296250440.0014549742@domain>
-  // Format: <{cr}.{mg}.{timestamp}.{rand}@domain>
-  const msgIdSuffix = `00${cryptoRand(10000000, 99999999)}`
-  const messageId = `<${cr}.${mg}.${timestamp}.${msgIdSuffix}@${domain}>`
-  headers.set('Message-ID', messageId)
 
-  // Standard Compliance Headers
-  headers.set('Errors-to', fromEmail)
-  
-  // List-Unsubscribe
-  const token = randHex(20)
-  const unsubUrl = `https://l.${domain}/rts/unsub.aspx?tp=${randHex(20)}&pi=${randHex(15)}`
-  const unsubMailto = `mailto:unsubscribe-${randHex(32)}@${domain}?subject=Unsubscribe`
-  
-  headers.set('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click')
-  headers.set('List-Unsubscribe', `<${unsubUrl}>,<${unsubMailto}>`)
+  // 1. Message-ID (Critical for Docomo)
+  // MUST align strictly with the Envelope-From domain.
+  // Format: <timestamp.random@domain> (Standard RFC)
+  // Docomo rejects malformed IDs or IDs from misaligned domains.
+  const timestamp = Date.now()
+  const msgId = `<${timestamp}.${randHex(6)}@${domain}>`
+  headers.set('Message-ID', msgId)
 
-  // X-Mailer & Xyz Headers
-  headers.set('X-Mailer', 'XyzMailer')
-  headers.set('X-Xyz-cr', cr.toString())
-  headers.set('X-Xyz-cn', cn.toString())
-  headers.set('X-Xyz-bcn', bcn.toString())
-  headers.set('X-Xyz-md', '100')
-  headers.set('X-Xyz-mg', mg.toString())
-  headers.set('X-Xyz-et', '113')
-  headers.set('X-Xyz-pk', pk.toString())
-  headers.set('X-Xyz-ct', ct.toString())
-  headers.set('X-Xyz-bct', bct.toString())
-  
-  // Recipient Hash (simulated)
-  if (toEmail) {
-      const rcptHash = crypto.createHash('sha256').update(toEmail).digest('hex')
-      headers.set('X-Xyz-Rcpt-Hash', rcptHash)
-  }
-
-  // Feedback-ID: 458.45126:ChtahDgtlMsJP
-  const feedbackHash = `C${randHex(6)}`
-  headers.set('Feedback-ID', `${cr}.${cn}:${feedbackHash}`)
-
-  // X-virtual-mta
-  headers.set('X-virtual-mta', `mta${cryptoRand(10, 50)}`)
-
-  // X-PVIQ: 000273-000603-000458-045126-000000
-  headers.set('X-PVIQ', `000273-000603-000${cr}-0${cn}-000000`)
-
-  // X-CM-MessageId: 458-45126
-  headers.set('X-CM-MessageId', `${cr}-${cn}`)
-
+  // 2. MIME Version (Standard)
   headers.set('MIME-Version', '1.0')
+
+  // 3. Identification (Random X-Mailer)
+  headers.set('X-Mailer', generateRandomMailer())
+  
+  // 4. Content Settings (Encoding)
+  // NOTE: The BODY must be ISO-2022-JP for max compatibility.
+  // Headers themselves often indicate this.
+  // We set a hint, but the body generator usually sets 'Content-Type'.
+  // We won't force it here to avoid conflict, but we avoid forcing UTF-8 headers.
+
+  // 5. Compliance (Japanese Law: Opt-Out)
+  // We usually need an unsubscribe link in the body.
+  // 'List-Unsubscribe' is good for RFC compliance but can trigger 'Bulk' filters.
+  // We keep it strict and clean.
+  const unsubToken = crypto.createHmac('sha256', 'jp_secret').update(toEmail || 'unknown').digest('hex')
+  const unsubUrl = `https://${domain}/optout?t=${unsubToken}`
+  const unsubMailto = `mailto:stop@${domain}?subject=Unsubscribe`
+  
+  // Docomo/au often ignore these, but Gmail users on mobile need them.
+  headers.set('List-Unsubscribe', `<${unsubUrl}>, <${unsubMailto}>`)
+  headers.set('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click')
+
+  // 6. Error Handling
+  // Route bounces back to sender to manage list hygiene (Critical for Docomo)
+  headers.set('Errors-To', fromEmail)
+  
+  // 7. Anti-Abuse / Feedback (Minimal)
+  // Large Feedback-IDs can look spammy.
+  // We use a compact, local tracking ID.
+  headers.set('X-Jp-Track', traceId)
+
+  // REMOVED: Precedence: bulk (Trigger for Docomo block)
+  // REMOVED: Auto-Submitted (Trigger for au block)
 
   return headers
 }
@@ -101,7 +98,7 @@ function generateHeaders(fromEmail, toEmail) {
 // ---------- Haraka Plugin Exports ----------
 
 exports.register = function () {
-  this.loginfo('Compliance Email Header Generator loaded')
+  this.loginfo('JP Carrier Optimizer loaded')
 }
 
 exports.hook_data_post = function (next, connection) {
@@ -115,62 +112,63 @@ exports.hook_data_post = function (next, connection) {
 
     if (!fromAddr) return next()
 
-    // Clean existing headers that might conflict
+    // 1. Scrub ALL existing risky/generated headers
     const toRemove = [
       'Message-ID', 'X-Mailer', 'User-Agent', 
       'List-Unsubscribe', 'List-Unsubscribe-Post',
-      'Feedback-ID', 'Errors-to', 'MIME-Version'
+      'Feedback-ID', 'Errors-To', 'MIME-Version',
+      'Precedence', 'Auto-Submitted', 'X-Priority',
+      'X-Originating-IP', 'X-PVIQ', 'X-Xyz-cr', 'X-Xyz-cn',
+      'X-TBot-Campaign', 'X-TBot-Worker', 'X-Sys-Campaign'
     ]
     
-    // Also remove any previous X-Xyz headers
+    // Wildcard removal for identifying headers
     const headerLines = txn.header.header_list
     headerLines.forEach(h => {
-        if (h.toLowerCase().startsWith('x-xyz-')) {
+        const lower = h.toLowerCase()
+        if (lower.startsWith('x-xyz-') || lower.startsWith('x-cm-') || lower.startsWith('x-virtual-')) {
             txn.remove_header(h.split(':')[0])
         }
     })
 
     toRemove.forEach(h => {
-      while (txn.header.get(h)) {
-        txn.remove_header(h)
-      }
+      while (txn.header.get(h)) txn.remove_header(h)
     })
 
-    // Generate new headers
+    // 2. Generate Optimized Headers
     const newHeaders = generateHeaders(fromAddr, toAddr)
 
-    // Apply headers in a specific order for cleanliness
+    // 3. Apply Order (Standard / Natural)
     const order = [
-      'Errors-to',
+      'MIME-Version',
       'Message-ID',
-      'List-Unsubscribe-Post',
-      'List-Unsubscribe',
       'X-Mailer',
-      'X-Xyz-cr', 'X-Xyz-cn', 'X-Xyz-bcn', 'X-Xyz-md', 'X-Xyz-mg', 
-      'X-Xyz-et', 'X-Xyz-pk', 'X-Xyz-ct', 'X-Xyz-bct', 'X-Xyz-Rcpt-Hash',
-      'Feedback-ID',
-      'X-virtual-mta',
-      'X-PVIQ',
-      'X-CM-MessageId',
-      'MIME-Version'
+      'Errors-To',
+      'List-Unsubscribe',
+      'List-Unsubscribe-Post',
+      'X-Jp-Track'
     ]
 
     for (const key of order) {
         if (newHeaders.has(key)) {
             txn.add_header(key, newHeaders.get(key))
-            newHeaders.delete(key) // Remove from map so we don't duplicate
+            newHeaders.delete(key)
         }
     }
     
-    // keys remaining in map?
+    // Add rest
     newHeaders.forEach((val, key) => {
         txn.add_header(key, val)
     })
 
-    connection.loginfo(plugin, `Generated Compliance Headers for ${toAddr}`)
+    // LOGGING: Remind admin about Throttling
+    if (toAddr && (toAddr.includes('docomo.ne.jp') || toAddr.includes('ezweb.ne.jp') || toAddr.includes('softbank.ne.jp'))) {
+        connection.loginfo(plugin, `[JP-Mobile] Sending to ${toAddr}. Ensure Max_Concurrency=1 for this domain to avoid blocks.`)
+    }
+
     next()
   } catch (err) {
-    connection.logerror(plugin, `Header generation error: ${err.message}`)
+    connection.logerror(plugin, `Header gen error: ${err.message}`)
     next()
   }
 }
