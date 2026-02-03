@@ -4,12 +4,12 @@ const crypto = require('crypto')
 const { faker } = require('@faker-js/faker')
 
 /*
-  Polymorphic Header Generator - Maximum Uniqueness
-  ==================================================
-  ✓ Each email has completely different header patterns
+  Polymorphic Header Generator - RFC Compliant
+  =============================================
+  ✓ All headers are RFC 5322 / RFC 2045 compliant
   ✓ Random inclusion/exclusion of optional headers
   ✓ Varied Message-ID formats mimicking different mail clients
-  ✓ Random X-Mailer / User-Agent selection
+  ✓ Randomized MIME boundary styles
   ✓ Randomized header ordering
 */
 
@@ -40,6 +40,15 @@ function shuffleArray(arr) {
   return a
 }
 
+function randAlphaNum(n) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  let result = ''
+  for (let i = 0; i < n; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
 // ---------- Domain Extraction ----------
 
 function parseDomain(email) {
@@ -47,12 +56,39 @@ function parseDomain(email) {
   return email.split('@')[1].toLowerCase()
 }
 
-function getLocalPart(email) {
-  if (!email || !email.includes('@')) return 'user'
-  return email.split('@')[0].toLowerCase()
+// ---------- Polymorphic MIME Boundary Generators (RFC 2046) ----------
+
+function generateBoundary() {
+  const styles = [
+    // Apple Mail style
+    () => `Apple-Mail=_${crypto.randomUUID().toUpperCase()}`,
+    // Outlook style
+    () => `----=_NextPart_${randInt(100, 999)}_${randInt(10000000, 99999999)}.${Date.now()}`,
+    // Thunderbird style
+    () => `------------${randHex(24)}`,
+    // Gmail style
+    () => `${randInt(1000000000, 9999999999).toString().padStart(10, '0')}${randInt(1000000000, 9999999999)}`,
+    // PHP Mailer style
+    () => `b1_${randHex(32)}`,
+    // Postfix style
+    () => `===============${randInt(1000000000, 9999999999)}==`,
+    // Simple random
+    () => `----${randAlphaNum(16)}`,
+    // Mixed style
+    () => `--boundary_${Date.now()}_${randHex(8)}`,
+    // Sendmail style
+    () => `${randInt(10000, 99999)}.${Date.now()}.${randInt(10000, 99999)}`,
+    // Exchange style
+    () => `_${randInt(100, 999)}_${randHex(8)}_${randInt(1000, 9999)}_`,
+    // MIME-tools style
+    () => `----------${randAlphaNum(20)}`,
+    // Java Mail style
+    () => `----=_Part_${randInt(0, 999)}_${randInt(100000000, 999999999)}.${Date.now()}`
+  ]
+  return pickRandom(styles)()
 }
 
-// ---------- Polymorphic Message-ID Generators ----------
+// ---------- Polymorphic Message-ID Generators (RFC 5322) ----------
 
 function generateMessageId(domain) {
   const formats = [
@@ -92,16 +128,15 @@ function generateMessageId(domain) {
       const hex = randHex(10).toUpperCase()
       return `<${hex}.${randHex(5)}@${domain}>`
     },
-    // SendGrid style
+    // Sendmail style
     () => {
-      const filter = randHex(16)
-      return `<${filter}.${randInt(1, 99999)}@${domain}>`
+      return `<${Date.now()}.${randAlphaNum(14)}@${domain}>`
     }
   ]
   return pickRandom(formats)()
 }
 
-// ---------- Polymorphic X-Mailer / User-Agent ----------
+// ---------- Polymorphic X-Mailer (Common Practice) ----------
 
 function generateMailClient() {
   const clients = [
@@ -120,12 +155,13 @@ function generateMailClient() {
     // Mobile
     () => `iPhone Mail (${randInt(15, 18)}${String.fromCharCode(randInt(65, 72))}${randInt(100, 999)})`,
     () => `Samsung Mail ${randInt(5, 7)}.${randInt(0, 9)}.${randInt(0, 50)}`,
-    // Fake company names
-    () => `${faker.company.name().replace(/[^a-zA-Z0-9 ]/g, '')} ${faker.system.semver()}`,
-    () => `${faker.word.noun()}mail ${randInt(1, 5)}.${randInt(0, 9)}.${randInt(0, 99)}`
+    // Generic
+    () => `${faker.company.name().replace(/[^a-zA-Z0-9 ]/g, '')} Mailer ${faker.system.semver()}`
   ]
   return pickRandom(clients)()
 }
+
+// ---------- User-Agent (RFC 5322 Comments) ----------
 
 function generateUserAgent() {
   const agents = [
@@ -137,103 +173,18 @@ function generateUserAgent() {
   return pickRandom(agents)()
 }
 
-// ---------- Optional Headers Pool ----------
+// ---------- RFC Compliant Optional Headers ----------
 
-function generateOptionalHeaders(domain, fromEmail, toEmail) {
+function generateOptionalHeaders(domain, fromEmail) {
   const pool = []
   
-  // X-Originating-IP (some clients add this)
+  // Organization (RFC 5322 - optional)
   if (coinFlip(0.2)) {
-    pool.push(['X-Originating-IP', `[${randInt(1, 223)}.${randInt(0, 255)}.${randInt(0, 255)}.${randInt(1, 254)}]`])
-  }
-  
-  // X-Priority (random priority levels)
-  if (coinFlip(0.15)) {
-    pool.push(['X-Priority', pickRandom(['1', '3', '5'])])
-  }
-  
-  // X-MSMail-Priority
-  if (coinFlip(0.1)) {
-    pool.push(['X-MSMail-Priority', pickRandom(['High', 'Normal', 'Low'])])
-  }
-  
-  // Importance
-  if (coinFlip(0.1)) {
-    pool.push(['Importance', pickRandom(['high', 'normal', 'low'])])
-  }
-  
-  // Organization
-  if (coinFlip(0.25)) {
     pool.push(['Organization', faker.company.name()])
   }
   
-  // X-MimeOLE
-  if (coinFlip(0.15)) {
-    pool.push(['X-MimeOLE', `Produced By Microsoft MimeOLE V${randInt(6, 16)}.${randInt(0, 9)}.${randInt(1000, 9999)}.${randInt(0, 9999)}`])
-  }
-  
-  // X-Spam-Status
-  if (coinFlip(0.1)) {
-    pool.push(['X-Spam-Status', 'No'])
-  }
-  
-  // Thread-Topic (sometimes added)
-  if (coinFlip(0.15)) {
-    pool.push(['Thread-Topic', faker.lorem.words(randInt(2, 5))])
-  }
-  
-  // X-Auto-Response-Suppress
-  if (coinFlip(0.1)) {
-    pool.push(['X-Auto-Response-Suppress', pickRandom(['DR', 'NDR', 'RN', 'NRN', 'OOF', 'AutoReply', 'All'])])
-  }
-  
-  // Accept-Language
-  if (coinFlip(0.2)) {
-    const langs = ['ja-JP', 'en-US', 'en-GB', 'ja', 'en-US, ja-JP', 'ja-JP, en-US']
-    pool.push(['Accept-Language', pickRandom(langs)])
-  }
-  
-  // Content-Language
-  if (coinFlip(0.2)) {
-    pool.push(['Content-Language', pickRandom(['ja', 'ja-JP', 'en-US', 'en'])])
-  }
-  
-  // X-MS-Has-Attach
-  if (coinFlip(0.1)) {
-    pool.push(['X-MS-Has-Attach', 'no'])
-  }
-  
-  // X-MS-TNEF-Correlator (empty, Outlook style)
-  if (coinFlip(0.08)) {
-    pool.push(['X-MS-TNEF-Correlator', ''])
-  }
-  
-  // References / In-Reply-To (fake thread)
-  if (coinFlip(0.12)) {
-    const fakeRef = `<${randHex(12)}@${domain}>`
-    pool.push(['References', fakeRef])
-    if (coinFlip(0.7)) {
-      pool.push(['In-Reply-To', fakeRef])
-    }
-  }
-  
-  // X-Mailman-Version
-  if (coinFlip(0.05)) {
-    pool.push(['X-Mailman-Version', `${randInt(2, 3)}.${randInt(0, 3)}.${randInt(0, 8)}`])
-  }
-  
-  // Disposition-Notification-To (read receipt)
-  if (coinFlip(0.05)) {
-    pool.push(['Disposition-Notification-To', fromEmail])
-  }
-  
-  // X-Confirm-Reading-To
-  if (coinFlip(0.03)) {
-    pool.push(['X-Confirm-Reading-To', fromEmail])
-  }
-  
-  // Reply-To (sometimes same, sometimes different format)
-  if (coinFlip(0.3)) {
+  // Reply-To (RFC 5322)
+  if (coinFlip(0.25)) {
     const formats = [
       fromEmail,
       `<${fromEmail}>`,
@@ -242,47 +193,77 @@ function generateOptionalHeaders(domain, fromEmail, toEmail) {
     pool.push(['Reply-To', pickRandom(formats)])
   }
   
+  // Content-Language (RFC 3282)
+  if (coinFlip(0.2)) {
+    pool.push(['Content-Language', pickRandom(['ja', 'ja-JP', 'en', 'en-US', 'en-GB'])])
+  }
+  
+  // In-Reply-To / References (RFC 5322 - fake thread for deliverability)
+  if (coinFlip(0.1)) {
+    const fakeRef = `<${randHex(12)}@${domain}>`
+    pool.push(['References', fakeRef])
+    if (coinFlip(0.6)) {
+      pool.push(['In-Reply-To', fakeRef])
+    }
+  }
+  
+  // Disposition-Notification-To (RFC 3798 - read receipt)
+  if (coinFlip(0.03)) {
+    pool.push(['Disposition-Notification-To', `<${fromEmail}>`])
+  }
+  
+  // Comments (RFC 5322)
+  if (coinFlip(0.05)) {
+    pool.push(['Comments', pickRandom([
+      'Authenticated sender',
+      'This message was sent securely',
+      ''
+    ])])
+  }
+  
+  // Keywords (RFC 5322)
+  if (coinFlip(0.05)) {
+    pool.push(['Keywords', faker.lorem.words(randInt(1, 3))])
+  }
+  
   return pool
 }
 
-// ---------- List-Unsubscribe Variations ----------
+// ---------- List-Unsubscribe (RFC 2369 / RFC 8058) ----------
 
 function generateUnsubscribeHeaders(domain, toEmail) {
   const headers = []
   
-  // 60% chance to include unsubscribe headers
-  if (!coinFlip(0.6)) return headers
+  // 50% chance to include
+  if (!coinFlip(0.5)) return headers
   
   const token = crypto.createHmac('sha256', randHex(8)).update(toEmail || 'x').digest('hex').slice(0, 32)
   
   const urlFormats = [
     `https://${domain}/unsubscribe?t=${token}`,
     `https://${domain}/optout/${token}`,
-    `https://${domain}/u/${token.slice(0, 16)}`,
-    `https://mail.${domain}/unsub?id=${token}`,
-    `https://${domain}/email/unsubscribe/${token}`
+    `https://${domain}/u/${token.slice(0, 16)}`
   ]
   
   const mailtoFormats = [
     `mailto:unsubscribe@${domain}?subject=Unsubscribe`,
     `mailto:unsub@${domain}?subject=Remove`,
-    `mailto:stop@${domain}`,
-    `mailto:optout@${domain}?subject=Optout-${token.slice(0, 8)}`
+    `mailto:optout@${domain}`
   ]
   
   const format = randInt(1, 4)
   
   switch(format) {
-    case 1: // URL only
+    case 1:
       headers.push(['List-Unsubscribe', `<${pickRandom(urlFormats)}>`])
       break
-    case 2: // Mailto only
+    case 2:
       headers.push(['List-Unsubscribe', `<${pickRandom(mailtoFormats)}>`])
       break
-    case 3: // Both
+    case 3:
       headers.push(['List-Unsubscribe', `<${pickRandom(urlFormats)}>, <${pickRandom(mailtoFormats)}>`])
       break
-    case 4: // Both + One-Click
+    case 4:
       headers.push(['List-Unsubscribe', `<${pickRandom(urlFormats)}>, <${pickRandom(mailtoFormats)}>`])
       headers.push(['List-Unsubscribe-Post', 'List-Unsubscribe=One-Click'])
       break
@@ -291,26 +272,19 @@ function generateUnsubscribeHeaders(domain, toEmail) {
   return headers
 }
 
-// ---------- Main Polymorphic Header Generator ----------
+// ---------- Main Header Generator ----------
 
 function generateHeaders(fromEmail, toEmail) {
   const domain = parseDomain(fromEmail)
   const headers = new Map()
   
-  // 1. Message-ID (Always required, but format varies)
+  // 1. Message-ID (RFC 5322 - required)
   headers.set('Message-ID', generateMessageId(domain))
   
-  // 2. Return-Path (Usually present)
-  if (coinFlip(0.85)) {
-    headers.set('Return-Path', `<${fromEmail}>`)
-  }
+  // 2. MIME-Version (RFC 2045)
+  headers.set('MIME-Version', '1.0')
   
-  // 3. MIME-Version (Almost always, slight variation)
-  if (coinFlip(0.95)) {
-    headers.set('MIME-Version', '1.0')
-  }
-  
-  // 4. X-Mailer OR User-Agent (not both usually)
+  // 3. X-Mailer OR User-Agent (common practice, not both)
   const mailerChoice = randInt(1, 4)
   if (mailerChoice === 1) {
     const mailer = generateMailClient()
@@ -318,43 +292,18 @@ function generateHeaders(fromEmail, toEmail) {
   } else if (mailerChoice === 2) {
     const ua = generateUserAgent()
     if (ua) headers.set('User-Agent', ua)
-  } else if (mailerChoice === 3) {
-    // Both (rare)
-    const mailer = generateMailClient()
-    const ua = generateUserAgent()
-    if (mailer) headers.set('X-Mailer', mailer)
-    if (ua) headers.set('User-Agent', ua)
   }
-  // mailerChoice === 4: neither (webmail style)
+  // 3,4 = no mailer (webmail style)
   
-  // 5. Errors-To (sometimes)
-  if (coinFlip(0.4)) {
-    headers.set('Errors-To', fromEmail)
-  }
-  
-  // 6. Unsubscribe headers (variable)
+  // 4. Unsubscribe headers (RFC 2369)
   const unsubHeaders = generateUnsubscribeHeaders(domain, toEmail)
   unsubHeaders.forEach(([k, v]) => headers.set(k, v))
   
-  // 7. Random optional headers
-  const optionalHeaders = generateOptionalHeaders(domain, fromEmail, toEmail)
-  // Pick random subset
-  const numOptional = randInt(0, Math.min(5, optionalHeaders.length))
+  // 5. Optional RFC headers
+  const optionalHeaders = generateOptionalHeaders(domain, fromEmail)
+  const numOptional = randInt(0, Math.min(3, optionalHeaders.length))
   const shuffled = shuffleArray(optionalHeaders).slice(0, numOptional)
   shuffled.forEach(([k, v]) => headers.set(k, v))
-  
-  // 8. Custom tracking (varied names to avoid pattern)
-  if (coinFlip(0.5)) {
-    const trackNames = ['X-Track', 'X-Msg-ID', 'X-Ref', 'X-UID', 'X-ID', 'X-Tag', 'X-Session']
-    const trackFormats = [
-      () => randHex(4).toUpperCase(),
-      () => randHex(8),
-      () => `${randInt(100000, 999999)}`,
-      () => crypto.randomUUID().split('-')[0],
-      () => `${Date.now().toString(36)}`
-    ]
-    headers.set(pickRandom(trackNames), pickRandom(trackFormats)())
-  }
   
   return headers
 }
@@ -362,19 +311,35 @@ function generateHeaders(fromEmail, toEmail) {
 // ---------- Randomized Header Order ----------
 
 function getRandomHeaderOrder(headerKeys) {
-  // Core headers that should be near top (but still shuffleable)
-  const coreHeaders = ['Return-Path', 'MIME-Version', 'Message-ID']
+  const coreHeaders = ['MIME-Version', 'Message-ID']
   const core = headerKeys.filter(k => coreHeaders.includes(k))
   const rest = headerKeys.filter(k => !coreHeaders.includes(k))
-  
-  // Shuffle core slightly, shuffle rest completely
   return [...shuffleArray(core), ...shuffleArray(rest)]
+}
+
+// ---------- Boundary Replacement in Content-Type ----------
+
+function replaceBoundary(contentType) {
+  if (!contentType || !contentType.includes('boundary')) return null
+  
+  const newBoundary = generateBoundary()
+  // Extract old boundary
+  const match = contentType.match(/boundary=["']?([^"';\s]+)["']?/i)
+  if (!match) return null
+  
+  const oldBoundary = match[1]
+  const newContentType = contentType.replace(
+    /boundary=["']?[^"';\s]+["']?/i, 
+    `boundary="${newBoundary}"`
+  )
+  
+  return { oldBoundary, newBoundary, newContentType }
 }
 
 // ---------- Haraka Plugin Exports ----------
 
 exports.register = function () {
-  this.loginfo('Polymorphic Header Generator loaded')
+  this.loginfo('Polymorphic Header Generator loaded (RFC Compliant)')
 }
 
 exports.hook_data_post = function (next, connection) {
@@ -388,29 +353,22 @@ exports.hook_data_post = function (next, connection) {
 
     if (!fromAddr) return next()
 
-    // 1. Scrub ALL existing headers that could create patterns
+    // 1. Headers to regenerate (we remove then add our own)
     const toRemove = [
-      'Return-Path', 'Message-ID', 'X-Mailer', 'User-Agent', 
+      'Message-ID', 'X-Mailer', 'User-Agent', 
       'List-Unsubscribe', 'List-Unsubscribe-Post',
-      'Feedback-ID', 'Errors-To', 'MIME-Version',
-      'Precedence', 'Auto-Submitted', 'X-Priority', 'X-MSMail-Priority',
-      'X-Originating-IP', 'X-PVIQ', 'X-Xyz-cr', 'X-Xyz-cn',
-      'X-TBot-Campaign', 'X-TBot-Worker', 'X-Sys-Campaign',
-      'Importance', 'Organization', 'X-MimeOLE', 'X-Spam-Status',
-      'Thread-Topic', 'X-Auto-Response-Suppress', 'Accept-Language',
-      'Content-Language', 'X-MS-Has-Attach', 'X-MS-TNEF-Correlator',
-      'References', 'In-Reply-To', 'X-Mailman-Version',
-      'Disposition-Notification-To', 'X-Confirm-Reading-To', 'Reply-To',
-      'X-Track', 'X-Msg-ID', 'X-Ref', 'X-UID', 'X-ID', 'X-Tag', 'X-Session', 'X-Jp-Track'
+      'Feedback-ID', 'MIME-Version',
+      'Precedence', 'Auto-Submitted',
+      'X-PVIQ', 'X-Xyz-cr', 'X-Xyz-cn',
+      'X-TBot-Campaign', 'X-TBot-Worker', 'X-Sys-Campaign'
     ]
     
-    // Wildcard removal for identifying headers
+    // Wildcard removal for fingerprinting headers
     const headerLines = txn.header.header_list
     headerLines.forEach(h => {
         const lower = h.toLowerCase()
         if (lower.startsWith('x-xyz-') || lower.startsWith('x-cm-') || 
-            lower.startsWith('x-virtual-') || lower.startsWith('x-ms-') ||
-            lower.startsWith('x-google-') || lower.startsWith('x-gm-')) {
+            lower.startsWith('x-virtual-') || lower.startsWith('x-gm-')) {
             txn.remove_header(h.split(':')[0])
         }
     })
@@ -419,10 +377,30 @@ exports.hook_data_post = function (next, connection) {
       while (txn.header.get(h)) txn.remove_header(h)
     })
 
-    // 2. Generate Polymorphic Headers (each email is unique)
+    // 2. Handle Content-Type boundary replacement
+    const contentType = txn.header.get('Content-Type')
+    if (contentType && contentType.includes('boundary')) {
+      const result = replaceBoundary(contentType)
+      if (result) {
+        // Update Content-Type header with new boundary
+        txn.remove_header('Content-Type')
+        txn.add_header('Content-Type', result.newContentType)
+        
+        // Replace boundary in body
+        if (txn.body && result.oldBoundary && result.newBoundary) {
+          const oldBody = txn.body.toString()
+          if (oldBody) {
+            const newBody = oldBody.split(result.oldBoundary).join(result.newBoundary)
+            txn.body = Buffer.from(newBody)
+          }
+        }
+      }
+    }
+
+    // 3. Generate RFC-compliant headers
     const newHeaders = generateHeaders(fromAddr, toAddr)
 
-    // 3. Apply in randomized order
+    // 4. Apply in randomized order
     const headerKeys = Array.from(newHeaders.keys())
     const randomOrder = getRandomHeaderOrder(headerKeys)
     
@@ -430,11 +408,6 @@ exports.hook_data_post = function (next, connection) {
       if (newHeaders.has(key)) {
         txn.add_header(key, newHeaders.get(key))
       }
-    }
-
-    // LOGGING for JP carriers
-    if (toAddr && (toAddr.includes('docomo.ne.jp') || toAddr.includes('ezweb.ne.jp') || toAddr.includes('softbank.ne.jp'))) {
-      connection.loginfo(plugin, `[JP-Mobile] Sending to ${toAddr}. Ensure Max_Concurrency=1.`)
     }
 
     next()
