@@ -8,6 +8,7 @@ sudo systemctl stop opendkim && sudo systemctl disable opendkim
 
 curl -fsSL -o /opt/haraka/plugins/x_header.js https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/x_header.js
 curl -fsSL -o /opt/haraka/plugins/alias.js https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/alias.js
+sudo sed -i 's/c=relaxed\/simple/c=relaxed\/relaxed/g' /usr/lib/node_modules/Haraka/node_modules/haraka-plugin-dkim/lib/dkim.js
 echo "✅ Plugins updated successfully."
 # Optionally restart Haraka
 systemctl restart haraka
