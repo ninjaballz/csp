@@ -132,9 +132,45 @@ exports.hook_mail = function (next, connection, params) {
 };
 
 function generateRandomLocal(domain) {
-    // Fixed pool of sender usernames
-    const pool = ['noreply', 'notifications', 'info', 'webmaster'];
-    return faker.helpers.arrayElement(pool);
+    // Domain-based strategy weighting
+    const isDotJp = domain.includes('.jp') || domain.includes('co.jp');
+    const isCommon = ['gmail', 'yahoo', 'outlook', 'hotmail', 'icloud'].some(d => domain.includes(d));
+    
+    let strategies;
+    
+    if (isDotJp) {
+        // Japanese domains prefer person names + numbers
+        strategies = [
+            { name: 'person_simple', weight: 0.35 },
+            { name: 'person_numbered', weight: 0.30 },
+            { name: 'person_dotted', weight: 0.20 },
+            { name: 'random_words', weight: 0.10 },
+            { name: 'internet_usernames', weight: 0.05 }
+        ];
+    } else if (isCommon) {
+        // Common providers use diverse patterns
+        strategies = [
+            { name: 'person_simple', weight: 0.25 },
+            { name: 'person_numbered', weight: 0.20 },
+            { name: 'internet_usernames', weight: 0.15 },
+            { name: 'random_words', weight: 0.15 },
+            { name: 'hobby_related', weight: 0.10 },
+            { name: 'color_animal', weight: 0.10 },
+            { name: 'location_based', weight: 0.05 }
+        ];
+    } else {
+        // Business/other domains prefer professional patterns
+        strategies = [
+            { name: 'person_simple', weight: 0.30 },
+            { name: 'person_dotted', weight: 0.25 },
+            { name: 'person_initial', weight: 0.20 },
+            { name: 'company_related', weight: 0.15 },
+            { name: 'department', weight: 0.10 }
+        ];
+    }
+    
+    const strategy = weightedChoice(strategies);
+    return generateByStrategy(strategy);
 }
 
 function weightedChoice(strategies) {
