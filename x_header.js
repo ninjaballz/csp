@@ -56,7 +56,10 @@ function generateHeaders(fromEmail, toEmail) {
   const msgId = `<${timestamp}.${randHex(6)}@${domain}>`
   headers.set('Message-ID', msgId)
 
-  // 2. MIME Version (Standard)
+  // 2. Return-Path (Critical for bounce handling)
+  headers.set('Return-Path', `<${fromEmail}>`)
+
+  // 3. MIME Version (Standard)
   headers.set('MIME-Version', '1.0')
 
   // 3. Identification (Random X-Mailer)
@@ -114,7 +117,7 @@ exports.hook_data_post = function (next, connection) {
 
     // 1. Scrub ALL existing risky/generated headers
     const toRemove = [
-      'Message-ID', 'X-Mailer', 'User-Agent', 
+      'Return-Path', 'Message-ID', 'X-Mailer', 'User-Agent', 
       'List-Unsubscribe', 'List-Unsubscribe-Post',
       'Feedback-ID', 'Errors-To', 'MIME-Version',
       'Precedence', 'Auto-Submitted', 'X-Priority',
@@ -140,6 +143,7 @@ exports.hook_data_post = function (next, connection) {
 
     // 3. Apply Order (Standard / Natural)
     const order = [
+      'Return-Path',
       'MIME-Version',
       'Message-ID',
       'X-Mailer',
