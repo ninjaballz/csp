@@ -33,14 +33,6 @@ function generateTraceId() {
   return crypto.randomBytes(4).toString('hex').toUpperCase()
 }
 
-// ---------- Random X-Mailer Generator (Using Faker) ----------
-
-function generateRandomMailer() {
-  const name = faker.company.name().replace(/[^a-zA-Z0-9 ]/g, '')
-  const version = faker.system.semver()
-  return `${name} ${version}`
-}
-
 // ---------- Japanese Carrier Optimized Headers ----------
 
 function generateHeaders(fromEmail, toEmail) {
@@ -138,11 +130,10 @@ exports.hook_data_post = function (next, connection) {
     const order = [
       'MIME-Version',
       'Message-ID',
-      'X-Mailer',
       'Errors-To',
       'List-Unsubscribe',
       'List-Unsubscribe-Post',
-=    ]
+    ]
 
     for (const key of order) {
         if (newHeaders.has(key)) {
