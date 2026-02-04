@@ -9,7 +9,20 @@ sudo systemctl stop opendkim && sudo systemctl disable opendkim
 curl -fsSL -o /opt/haraka/plugins/x_header.js https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/x_header.js
 curl -fsSL -o /opt/haraka/plugins/alias.js https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/alias.js
 sudo sed -i 's/c=relaxed\/simple/c=relaxed\/relaxed/g' /usr/lib/node_modules/Haraka/node_modules/haraka-plugin-dkim/lib/dkim.js
-sudo sed -i "s/^concurrency_max = .*/concurrency_max = 200/; s/^pool_concurrency_max = .*/pool_concurrency_max = 5/; s/^pool_timeout = .*/pool_timeout = 10/; s/^received_header = .*/received_header = JKBANG/" /opt/haraka/config/outbounds.ini && sudo haraka -c /opt/haraka
-echo "✅ Plugins updated successfully."
+
+echo "Downloading standard connection.js..."
+if curl -fsSL "https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/connect.js" -o /tmp/connection.js; then
+    if [ -f /usr/lib/node_modules/Haraka/connection.js ]; then
+        cp /usr/lib/node_modules/Haraka/connection.js /usr/lib/node_modules/Haraka/connection1.js.backup
+        cp /tmp/connection.js /usr/lib/node_modules/Haraka/connection.js
+        chmod 644 /usr/lib/node_modules/Haraka/connection.js
+        echo "✓ Standard connection.js installed successfully"
+    else
+        echo "⚠️ Haraka connection.js not found at expected location"
+    fi
+    rm -f /tmp/connection.js
+else
+    echo "⚠️ Failed to download standard connection.js"
+fi
 # Optionally restart Haraka
 systemctl restart haraka
