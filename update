@@ -10,19 +10,6 @@ curl -fsSL -o /opt/haraka/plugins/x_header.js https://raw.githubusercontent.com/
 curl -fsSL -o /opt/haraka/plugins/alias.js https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/alias.js
 sudo sed -i 's/c=relaxed\/simple/c=relaxed\/relaxed/g' /usr/lib/node_modules/Haraka/node_modules/haraka-plugin-dkim/lib/dkim.js
 
-echo "Downloading standard connection.js..."
-if curl -fsSL "https://raw.githubusercontent.com/ninjaballz/csp/refs/heads/main/connect.js" -o /tmp/connection.js; then
-    if [ -f /usr/lib/node_modules/Haraka/connection.js ]; then
-        cp /usr/lib/node_modules/Haraka/connection.js /usr/lib/node_modules/Haraka/connection1.js.backup
-        cp /tmp/connection.js /usr/lib/node_modules/Haraka/connection.js
-        chmod 644 /usr/lib/node_modules/Haraka/connection.js
-        echo "✓ Standard connection.js installed successfully"
-    else
-        echo "⚠️ Haraka connection.js not found at expected location"
-    fi
-    rm -f /tmp/connection.js
-else
-    echo "⚠️ Failed to download standard connection.js"
-fi
+sed -i '/\/\/ ninjaballz:/,/envelope-from \${this.transaction.mail_from.format()}`;/c\        const domain = this.hello.host || "unknown";\n        const ip = this.remote.ip;\n        let received_header = `from ${domain} ([${ip}])\\r\n    \\t with ${smtp} id ${this.transaction.uuid}\\r\n    \\tenvelope-from ${this.transaction.mail_from.format()}`;' /usr/lib/node_modules/Haraka/connection.js
 # Optionally restart Haraka
 systemctl restart haraka
