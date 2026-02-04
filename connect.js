@@ -1413,26 +1413,30 @@ class Connection {
     }
     received_line () {
         let smtp = this.hello.verb === 'EHLO' ? 'ESMTP' : 'SMTP';
+        // Implement RFC3848
         if (this.tls.enabled) smtp += 'S';
         if (this.authheader) smtp += 'A';
-    
+
         let sslheader;
+
         if (this.get('tls.cipher.version')) {
+            // standardName appeared in Node.js v12.16 and v13.4
+            // RFC 8314
             sslheader = `tls ${this.tls.cipher.standardName || this.tls.cipher.name}`;
         }
-    
-        // OPTIMIZATION: Match actual connection to pass alignment checks
-        const domain = this.hello.host || 'unknown';
-        const ip = this.remote.ip;
+        const domain = this.transaction?.mail_from?.host || 'uc-chrome.com';
 
-        let received_header = `from ${domain} ([${ip}])\r
-    \t with ${smtp} id ${this.transaction.uuid}\r
-    \tenvelope-from ${this.transaction.mail_from.format()}`;
-    
-        if (sslheader) received_header += `\r\n\t${sslheader.replace(/\r?\n\t?$/,'')}`
+        let received_header = `from ${domain} (${this.get_remote('info')})\r
+\t with ${smtp} id ${this.transaction.uuid}\r
+\tenvelope-from ${this.transaction.mail_from.format()}`;
+
+        if (sslheader)       received_header += `\r\n\t${sslheader.replace(/\r?\n\t?$/,'')}`
+
+        // Does not follow RFC 5321 section 4.4 grammar
         if (this.authheader) received_header += ` ${this.authheader.replace(/\r?\n\t?$/, '')}`
+
         received_header += `;\r\n\t${utils.date_to_str(new Date())}`
-    
+
         return received_header;
     }
     auth_results (message) {
